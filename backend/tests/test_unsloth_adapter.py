@@ -1,0 +1,50 @@
+import pytest
+import shutil
+import json
+from pathlib import Path
+from backend.adapters.unsloth import UnslothAdapter
+
+def test_unsloth_adapter_e2e(tmp_path):
+    """
+    Integration test for the Unsloth Adapter.
+    Verifies that we can prepare, estimate_resources, and run a short train loop.
+    Prints actual peak VRAM to ensure our limits match diagnostic reality.
+    """
+    adapter = UnslothAdapter()
+    
+    # 1. Capabilities
+    caps = adapter.capabilities()
+    assert "unsloth_llama3.2_3b" in caps["supported_models"]
+    
+    # 2. Config 
+    config = {
+        "max_seq_length": 512, # safe default for test
+        "per_device_train_batch_size": 1,
+        "prepared_dir": str(tmp_path / "prepared")
+    }
+    
+    # 3. Estimate Resources
+    # This should pass without raising ValueError
+    estimate = adapter.estimate_resources("unsloth_llama3.2_3b", 10, config)
+    assert estimate.vram_required_mb <= 4500
+    
+    # 4. Prepare (mock dataset)
+    prepared_dir = adapter.prepare(Path(tmp_path), config)
+    assert (prepared_dir / "train.jsonl").exists()
+    
+    # 5. Train
+    print("\n--- Starting Unsloth Integration Test Training ---")
+    train_result = adapter.train(prepared_dir, config)
+    print("--- Training Completed ---")
+    
+    assert train_result.artifact_path.exists()
+    assert (train_result.artifact_path / "adapter_config.json").exists(), "LoRA adapter weights were not saved."
+    
+    peak_vram = train_result.metrics.get("peak_vram_gb", 0)
+    print(f"\n[DIAGNOSTIC VERIFICATION] Peak VRAM during train loop: {peak_vram} GB")
+    assert peak_vram > 0, "Failed to record peak VRAM"
+    
+    if peak_vram > 4.5:
+        print(f"WARNING: Actual peak VRAM ({peak_vram} GB) exceeded our estimated safe limit (4.5 GB)!")
+    else:
+        print(f"SUCCESS: Actual peak VRAM ({peak_vram} GB) is within our 4.5 GB estimate.")

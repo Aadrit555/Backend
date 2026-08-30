@@ -1,0 +1,134 @@
+[
+  {
+    "title": "Normal Conversation",
+    "mapping": {
+      "id1": {
+        "message": {
+          "author": {
+            "role": "user"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Hello!"
+            ]
+          },
+          "create_time": 100
+        }
+      },
+      "id2": {
+        "message": {
+          "author": {
+            "role": "assistant"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Hi! How can I help?"
+            ]
+          },
+          "create_time": 101
+        }
+      }
+    }
+  },
+  {
+    "title": "Conversation with Empty Message",
+    "mapping": {
+      "id1": {
+        "message": {
+          "author": {
+            "role": "user"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "create_time": 100
+        }
+      },
+      "id2": {
+        "message": {
+          "author": {
+            "role": "assistant"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "create_time": 101
+        }
+      },
+      "id3": {
+        "message": {
+          "author": {
+            "role": "user"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Wait, are you there?"
+            ]
+          },
+          "create_time": 102
+        }
+      }
+    }
+  },
+  {
+    "title": "Duplicated Conversation",
+    "mapping": {
+      "id1": {
+        "message": {
+          "author": {
+            "role": "user"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Hello!"
+            ]
+          },
+          "create_time": 100
+        }
+      },
+      "id2": {
+        "message": {
+          "author": {
+            "role": "assistant"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Hi! How can I help?"
+            ]
+          },
+          "create_time": 101
+        }
+      }
+    }
+  },
+  {
+    "title": "Empty Conversation",
+    "mapping": {
+      "id1": {
+        "message": {
+          "author": {
+            "role": "system"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "create_time": 100
+        }
+      }
+    }
+  }
+]

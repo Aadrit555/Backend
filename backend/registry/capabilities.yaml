@@ -1,0 +1,214 @@
+# Capability Registry — BIBLE §16, ARCHITECTURE.md §5.
+#
+# Static definition of what the platform CAN do: which models exist,
+# which backends support them, VRAM estimates, and licenses.
+# Loaded at startup by registry/loader.py.
+# The orchestrator's validation gate queries this before accepting any
+# tool call that references a model or backend.
+#
+# Each model entry needs:
+#   id (the YAML key), modalities, supported_tasks, training_methods,
+#   min_vram_mb (inside vram_estimates), backend_id (inside backends list).
+
+models:
+
+  # =========================================================================
+  # World 1: LLM  (BIBLE §19, §47 World 1)
+  # =========================================================================
+
+  unsloth_llama3.2_3b:
+    modalities: [text]
+    tasks: [fine_tuning, text_generation]
+    training_methods: [qlora]
+    backends: [unsloth]
+    vram_estimates:
+      qlora: { min_mb: 4000, recommended_mb: 4500 }
+    license: llama-3.2-community
+    description: >
+      LLaMA 3.2 3B Instruct (4-bit) — VRAM-diagnosed baseline. 
+      Requires ~4.5GB VRAM for QLoRA with batch size 1.
+
+  unsloth_qwen2.5_3b:
+    modalities: [text]
+    tasks: [fine_tuning, text_generation]
+    training_methods: [qlora]
+    backends: [unsloth]
+    vram_estimates:
+      qlora: { min_mb: 3000, recommended_mb: 3500 }
+    license: apache-2.0
+    description: >
+      Qwen 2.5 3B Instruct (4-bit) — VRAM-diagnosed candidate.
+      Peak VRAM measured at ~2.9GB for QLoRA with batch size 1.
+
+  unsloth_llama3.2_1b:
+    modalities: [text]
+    tasks: [fine_tuning, text_generation]
+    training_methods: [qlora]
+    backends: [unsloth]
+    vram_estimates:
+      qlora: { min_mb: 3500, recommended_mb: 4000 }
+    license: llama-3.2-community
+    description: >
+      LLaMA 3.2 1B Instruct (4-bit) — VRAM-diagnosed candidate.
+      Peak VRAM measured at ~3.4GB for QLoRA with batch size 1.
+
+  qwen2.5-7b:
+    modalities: [text]
+    tasks: [fine_tuning, text_generation]
+    training_methods: [sft, lora, qlora]
+    backends: [llama_factory]
+    vram_estimates:
+      sft:   { min_mb: 28000, recommended_mb: 48000 }
+      lora:  { min_mb: 8000,  recommended_mb: 16000 }
+      qlora: { min_mb: 5000,  recommended_mb: 10000 }
+    license: apache-2.0
+    description: >
+      Qwen 2.5 7B — strong multilingual LLM. 16 GB VRAM recommended
+      for LoRA fine-tuning.
+
+  qwen2.5-3b:
+    modalities: [text]
+    tasks: [fine_tuning, text_generation]
+    training_methods: [sft, lora, qlora]
+    backends: [llama_factory]
+    vram_estimates:
+      sft:   { min_mb: 14000, recommended_mb: 24000 }
+      lora:  { min_mb: 5000,  recommended_mb: 10000 }
+      qlora: { min_mb: 3500,  recommended_mb: 6000  }
+    license: apache-2.0
+    description: >
+      Qwen 2.5 3B — smaller variant, fits on consumer GPUs even for SFT.
+
+  llama-3.1-8b:
+    modalities: [text]
+    tasks: [fine_tuning, text_generation]
+    training_methods: [sft, lora, qlora]
+    backends: [llama_factory]
+    vram_estimates:
+      sft:   { min_mb: 30000, recommended_mb: 48000 }
+      lora:  { min_mb: 9000,  recommended_mb: 16000 }
+      qlora: { min_mb: 6000,  recommended_mb: 12000 }
+    license: llama-3.1-community
+    description: >
+      Meta LLaMA 3.1 8B — high-quality instruction-following LLM.
+
+  gemma-2-9b:
+    modalities: [text]
+    tasks: [fine_tuning, text_generation]
+    training_methods: [sft, lora, qlora]
+    backends: [llama_factory]
+    vram_estimates:
+      sft:   { min_mb: 32000, recommended_mb: 48000 }
+      lora:  { min_mb: 10000, recommended_mb: 18000 }
+      qlora: { min_mb: 7000,  recommended_mb: 12000 }
+    license: gemma
+    description: >
+      Google Gemma 2 9B — strong reasoning and code capabilities.
+
+  # =========================================================================
+  # World 2: Tabular  (BIBLE §19, §47 World 2)
+  # =========================================================================
+
+  autogluon_best:
+    modalities: [tabular]
+    tasks: [classification, regression, ranking]
+    training_methods: [autogluon]
+    backends: [autogluon]
+    vram_estimates:
+      # AutoGluon is primarily CPU. min_mb: 0 means no GPU required.
+      autogluon: { min_mb: 0, recommended_mb: 0 }
+    ram_estimates:
+      autogluon: { min_mb: 512, recommended_mb: 4096 }
+    license: apache-2.0
+    description: >
+      AutoGluon-style ensemble of XGBoost, LightGBM, CatBoost, and
+      scikit-learn models. Automatically trains multiple model families
+      and selects the best. Primarily CPU — no GPU required.
+    sub_models:
+      - xgboost
+      - lightgbm
+      - random_forest
+      - extra_trees
+      - logistic_regression
+      - knn
+
+  # =========================================================================
+  # World 3: Vision  (BIBLE §19, §47 World 3)
+  # =========================================================================
+
+  yolov8n:
+    modalities: [image, video]
+    tasks: [object_detection, classification, segmentation]
+    training_methods: [full]
+    backends: [ultralytics]
+    vram_estimates:
+      full: { min_mb: 4000, recommended_mb: 8000 }
+    license: agpl-3.0
+    description: >
+      YOLOv8 Nano — fastest, smallest YOLO variant. Good for real-time
+      detection on edge devices.
+
+  yolov8s:
+    modalities: [image, video]
+    tasks: [object_detection, classification, segmentation]
+    training_methods: [full]
+    backends: [ultralytics]
+    vram_estimates:
+      full: { min_mb: 6000, recommended_mb: 10000 }
+    license: agpl-3.0
+    description: >
+      YOLOv8 Small — balanced speed/accuracy tradeoff.
+
+
+  # =========================================================================
+  # World 4: RAG (Retrieval Augmented Generation)
+  # =========================================================================
+
+  rag_default:
+    modalities: [text]
+    tasks: [rag, question_answering]
+    training_methods: [faiss_index]
+    backends: [rag]
+    vram_estimates:
+      faiss_index: { min_mb: 0, recommended_mb: 0 }
+    ram_estimates:
+      faiss_index: { min_mb: 512, recommended_mb: 2048 }
+    license: apache-2.0
+    description: >
+      Retrieval-Augmented Generation using CPU-based FAISS and all-MiniLM-L6-v2 
+      embeddings, backed by Llama 3.3 70B for grounded generation. Requires no GPU.
+
+# ===========================================================================
+# Backend adapter definitions
+# ===========================================================================
+
+backends:
+
+  rag:
+    adapter_class: backend.adapters.rag.RagAdapter
+    license: apache-2.0
+    description: >
+      Constructs FAISS vector indices from documents and provides retrieval 
+      for grounded generation.
+
+  llama_factory:
+    adapter_class: backend.adapters.llama_factory.LlamaFactoryAdapter
+    license: apache-2.0
+    description: LLM/VLM fine-tuning (SFT, LoRA, QLoRA) via LLaMA-Factory.
+
+  unsloth:
+    adapter_class: backend.adapters.unsloth.UnslothAdapter
+    license: apache-2.0
+    description: Memory-efficient LLM fine-tuning via Unsloth.
+
+  autogluon:
+    adapter_class: backend.adapters.autogluon.AutoGluonAdapter
+    license: apache-2.0
+    description: >
+      Tabular AutoML — trains an ensemble of XGBoost, LightGBM, and
+      scikit-learn models, selects the best.
+
+  ultralytics:
+    adapter_class: backend.adapters.ultralytics.UltralyticsAdapter
+    license: agpl-3.0
+    description: Computer vision training via Ultralytics YOLOv8.

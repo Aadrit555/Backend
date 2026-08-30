@@ -1,0 +1,132 @@
+[
+  {
+    "title": "Conversation A (Original)",
+    "current_node": "node2",
+    "mapping": {
+      "node1": {
+        "parent": null,
+        "message": {
+          "author": {
+            "role": "user"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Tell me a joke."
+            ]
+          }
+        }
+      },
+      "node2": {
+        "parent": "node1",
+        "message": {
+          "author": {
+            "role": "assistant"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Why did the chicken cross the road?"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "title": "Conversation A (Edited - 1 char diff)",
+    "current_node": "node2",
+    "mapping": {
+      "node1": {
+        "parent": null,
+        "message": {
+          "author": {
+            "role": "user"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Tell me a joke."
+            ]
+          }
+        }
+      },
+      "node2": {
+        "parent": "node1",
+        "message": {
+          "author": {
+            "role": "assistant"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Why did the chicken cross the road!"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "title": "Branched Conversation",
+    "current_node": "key_C2_active",
+    "mapping": {
+      "key_C1_abandoned": {
+        "parent": "key_B",
+        "message": {
+          "author": {
+            "role": "user"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "This should NOT be extracted."
+            ]
+          }
+        }
+      },
+      "key_A": {
+        "parent": null,
+        "message": {
+          "author": {
+            "role": "user"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Step 1: start."
+            ]
+          }
+        }
+      },
+      "key_C2_active": {
+        "parent": "key_B",
+        "message": {
+          "author": {
+            "role": "user"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "This SHOULD be extracted."
+            ]
+          }
+        }
+      },
+      "key_B": {
+        "parent": "key_A",
+        "message": {
+          "author": {
+            "role": "assistant"
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Step 2: responding."
+            ]
+          }
+        }
+      }
+    }
+  }
+]

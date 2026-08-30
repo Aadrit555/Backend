@@ -1,0 +1,35 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# === Environment ===
+.env
+backend/.env
+
+# === Storage (local data — never commit) ===
+backend/storage/raw/*
+backend/storage/processed/*
+backend/storage/models/*
+backend/storage/experiments/*
+backend/storage/logs/*
+!backend/storage/**/.gitkeep
+
+# === SQLite ===
+*.sqlite3
+*.db
+
+# === Node / Next.js ===
+node_modules/
+frontend/.next/
+frontend/out/
+
+# === IDE ===
+.idea/
+.vscode/
+*.swp
+*.swo
