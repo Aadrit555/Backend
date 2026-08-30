@@ -150,10 +150,9 @@ export default function BeginnerPage() {
 
   const handleBuild = async () => {
     setIsBuilding(true);
-    setStatusLogs([{ stage: "started", message: "Preparing dataset for execution...", pct: 0, updated_at: new Date().toISOString(), _frontend: true }]);
+    setStatusLogs([{ stage: "started", message: "Initiating expert build...", pct: 0, updated_at: new Date().toISOString(), _frontend: true }]);
     
     try {
-      // Direct expert build bypasses Orchestrator
       const res = await fetch("http://localhost:8000/api/expert_build", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -284,13 +283,11 @@ export default function BeginnerPage() {
         ))}
       </div>
 
-      </div>
       <section className="card">
         <h2>Model Selection</h2>
         <select 
           value={modelCandidate} 
           onChange={(e) => setModelCandidate(e.target.value)}
-          style={{ width: "100%", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", padding: "0.8rem", color: "white", borderRadius: "8px", marginTop: "0.5rem" }}
           disabled={isBuilding}
         >
           {activeTab === "tabular" && (
@@ -352,7 +349,6 @@ export default function BeginnerPage() {
         </select>
       </section>
 
-      <section>
       <section className="card">
         <h2>Data Ingestion</h2>
         {!manifest ? (
@@ -417,7 +413,7 @@ export default function BeginnerPage() {
       </div>
 
       {statusLogs.length > 0 && (
-        <section className="card" style={{ marginTop: "3rem" }}>
+        <section className="card" style={{ marginTop: "2rem" }}>
           <h2>Pipeline Execution Log</h2>
           <div className="terminal">
             {statusLogs.map((log, idx) => (
@@ -436,7 +432,7 @@ export default function BeginnerPage() {
       )}
 
       {finalMetrics && finalMetrics.leaderboard && (
-        <section className="card" style={{ marginTop: "3rem", marginBottom: "4rem" }}>
+        <section className="card" style={{ marginTop: "2rem", marginBottom: "4rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
             <h2>Training Results</h2>
             <a 
@@ -480,7 +476,7 @@ export default function BeginnerPage() {
       )}
 
       {(experimentBackend === "unsloth" || (finalMetrics && finalMetrics.retrieval_accuracy !== undefined)) && (
-        <section style={{ marginTop: "3rem", marginBottom: "4rem" }}>
+        <section className="card" style={{ marginTop: "2rem", marginBottom: "4rem" }}>
           <h2>{experimentBackend === "unsloth" ? "LLM Chat Interface" : "RAG Chat Interface"}</h2>
           <div className="terminal" style={{ backgroundColor: "#1e1e1e", color: "#d4d4d4", padding: "1.5rem", borderRadius: "8px", minHeight: "300px", display: "flex", flexDirection: "column" }}>
             <div style={{ flex: 1, overflowY: "auto", marginBottom: "1rem" }}>
