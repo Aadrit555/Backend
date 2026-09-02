@@ -44,12 +44,15 @@ def generate_answer(query: str, retrieved_chunks: list[dict[str, Any]]) -> dict[
         context_text += chunk["text"] + "\n\n"
         
     system_prompt = (
-        "You are an intelligent, factual AI assistant. Answer the user's question directly, concisely, and accurately based ONLY on the provided context.\n"
-        "1. Answer ONLY what was asked using clean formatting, bullet points, and concise language.\n"
-        "2. Do not dump the entire raw context or irrelevant sections.\n"
-        "3. If the context does not contain the answer, say 'The provided document does not contain this information.'"
+        "You are an expert, helpful AI assistant analyzing a provided document.\n"
+        "Your task is to answer the user's question accurately, directly, and comprehensively based on the context:\n"
+        "- If asked where someone studies, their university, or education: state their university (e.g. SRM University AP), degree, and coursework clearly.\n"
+        "- If asked about projects: list their projects and key technical implementations with concise bullet points.\n"
+        "- If asked about skills, experience, or background: summarize the relevant details directly.\n"
+        "- Format your answer with clean markdown bullet points and bold highlights.\n"
+        "- Answer concisely without dumping unrelated text."
     )
-    user_prompt = f"Context:\n{context_text}\n\nQuestion: {query}"
+    user_prompt = f"Document Context:\n\"\"\"\n{context_text}\n\"\"\"\n\nUser Question: {query}"
     
     messages = [
         {"role": "system", "content": system_prompt},

@@ -754,9 +754,21 @@ export default function BeginnerPage() {
         {/* Inference / Chat UI */}
         {(experimentBackend === "unsloth" || (finalMetrics && finalMetrics.retrieval_accuracy !== undefined)) && (
           <section className="flex flex-col gap-4 mt-8 mb-24">
-            <h2 className="text-label-caps font-label-caps text-on-surface-variant border-b border-[#1A1A1A] pb-2">
-              {experimentBackend === "unsloth" ? "INFERENCE ENDPOINT" : "RAG ENDPOINT"}
-            </h2>
+            <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-2">
+              <h2 className="text-label-caps font-label-caps text-on-surface-variant">
+                {experimentBackend === "unsloth" ? "INFERENCE ENDPOINT" : "RAG ENDPOINT"}
+              </h2>
+              {experimentId && !isBuilding && (
+                <a
+                  href={`http://localhost:8000/api/experiments/${experimentId}/download`}
+                  download
+                  className="px-4 py-1.5 bg-[#00E5FF]/10 border border-[#00E5FF]/40 text-[#00E5FF] hover:bg-[#00E5FF] hover:text-black font-mono text-xs font-bold transition-all flex items-center gap-2"
+                >
+                  <span>⬇</span>
+                  <span>DOWNLOAD MODEL (.ZIP)</span>
+                </a>
+              )}
+            </div>
 
             <div className="bg-[#0e0e0e] border border-[#1A1A1A] p-6 flex flex-col min-h-[400px]">
               <div className="flex-1 overflow-y-auto mb-4 flex flex-col gap-6">

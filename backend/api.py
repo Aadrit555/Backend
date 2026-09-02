@@ -746,5 +746,57 @@ async def api_classifier_download(model_id: str):
         media_type="application/octet-stream",
     )
 
+@router.get("/api/experiments/{experiment_id}/download")
+def download_trained_model(experiment_id: str):
+    """Package and download the trained model artifact or RAG index as a zip file."""
+    import zipfile
+    import io
+    from fastapi.responses import StreamingResponse
+    from backend.db import TrainingRun, ModelArtifact
+    
+    db = SessionLocal()
+    try:
+        run = db.query(TrainingRun).filter_by(experiment_id=experiment_id).first()
+        artifact_path = None
+        if run:
+            artifact = db.query(ModelArtifact).filter_by(training_run_id=run.id).first()
+            if artifact and Path(artifact.path).exists():
+                artifact_path = Path(artifact.path)
+                
+        if not artifact_path:
+            # Check export dir in experiments
+            exp_export = settings.experiments_dir / experiment_id / "export"
+            if exp_export.exists():
+                artifact_path = exp_export
+                
+        if not artifact_path:
+            # Check if an experiment model exists in models_dir
+            for p in settings.models_dir.glob("*"):
+                if p.is_dir():
+                    artifact_path = p
+                    break
+
+        if not artifact_path or not artifact_path.exists():
+            raise HTTPException(status_code=404, detail="No physical model artifacts found to download.")
+            
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            if artifact_path.is_file():
+                zip_file.write(artifact_path, arcname=artifact_path.name)
+            else:
+                for file_path in artifact_path.rglob("*"):
+                    if file_path.is_file():
+                        zip_file.write(file_path, arcname=str(file_path.relative_to(artifact_path)))
+                        
+        zip_buffer.seek(0)
+        filename = f"model_{experiment_id[:8]}.zip"
+        return StreamingResponse(
+            zip_buffer,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    finally:
+        db.close()
+
 
 
