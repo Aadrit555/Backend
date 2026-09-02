@@ -194,42 +194,66 @@ class UnslothAdapter(BackendAdapter):
                     print(f"Failed to structure chunk: {e}")
                     
     def _sanitize_pii(self, input_jsonl: Path, output_jsonl: Path) -> None:
-        import subprocess
-        import sys
-        
-        script = f"""
-import json
-from pathlib import Path
-from presidio_analyzer import AnalyzerEngine
-from presidio_anonymizer import AnonymizerEngine
+        import re
+        import json
 
-analyzer = AnalyzerEngine()
-anonymizer = AnonymizerEngine()
+        # Regex patterns for zero-dependency high-precision PII & secrets redaction
+        PATTERNS = [
+            (re.compile(r'(?i)\b(?:bearer\s+[a-zA-Z0-9_\-\.]{16,}|(?:api[_-]?key|secret|token)\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{16,}["\']?)'), "<SECRET_REDACTED>"),
+            (re.compile(r'\b[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\b'), "<EMAIL_REDACTED>"),
+            (re.compile(r'\b\d{3}-\d{2}-\d{4}\b'), "<SSN_REDACTED>"),
+            (re.compile(r'\b(?:\d{4}[- ]?){3}\d{4}\b'), "<CARD_REDACTED>"),
+            (re.compile(r'\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b'), "<PHONE_REDACTED>"),
+            (re.compile(r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'), "<IP_REDACTED>"),
+        ]
 
-with open("{input_jsonl}", "r") as fin, open("{output_jsonl}", "w") as fout:
-    for line in fin:
-        if not line.strip(): continue
+        def scrub_text(text: str) -> str:
+            if not text:
+                return text
+            for pattern, repl in PATTERNS:
+                text = pattern.sub(repl, text)
+            return text
+
+        # Check for optional Microsoft Presidio
+        has_presidio = False
         try:
-            data = json.loads(line)
-            if "conversations" in data:
-                for turn in data["conversations"]:
-                    text = turn.get("value", "")
-                    if text:
-                        results = analyzer.analyze(text=text, entities=["EMAIL_ADDRESS", "PHONE_NUMBER", "PERSON"], language='en')
-                        anonymized_result = anonymizer.anonymize(text=text, analyzer_results=results)
-                        turn["value"] = anonymized_result.text
-            fout.write(json.dumps(data) + "\\n")
-        except Exception as e:
-            print(f"Error sanitizing line: {{e}}")
-            fout.write(line)
-"""
-        try:
-            print("[DATA FACTORY] Running Presidio sanitization in isolated subprocess...")
-            subprocess.run([sys.executable, "-c", script], check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"[DATA FACTORY] Presidio subprocess failed: {e}")
-            import shutil
-            shutil.copy2(input_jsonl, output_jsonl)
+            from presidio_analyzer import AnalyzerEngine
+            from presidio_anonymizer import AnonymizerEngine
+            analyzer = AnalyzerEngine()
+            anonymizer = AnonymizerEngine()
+            has_presidio = True
+        except Exception:
+            pass
+
+        engine_name = "Microsoft Presidio" if has_presidio else "Pattern Sanitizer"
+        print(f"[DATA FACTORY] Running PII sanitization via {engine_name}...")
+
+        with open(input_jsonl, "r", encoding="utf-8") as fin, open(output_jsonl, "w", encoding="utf-8") as fout:
+            for line in fin:
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                    if "conversations" in data:
+                        for turn in data["conversations"]:
+                            val = turn.get("value", "")
+                            if val:
+                                if has_presidio:
+                                    results = analyzer.analyze(text=val, entities=["EMAIL_ADDRESS", "PHONE_NUMBER", "PERSON"], language='en')
+                                    turn["value"] = anonymizer.anonymize(text=val, analyzer_results=results).text
+                                else:
+                                    turn["value"] = scrub_text(val)
+                    elif "text" in data:
+                        val = data.get("text", "")
+                        if val:
+                            if has_presidio:
+                                results = analyzer.analyze(text=val, entities=["EMAIL_ADDRESS", "PHONE_NUMBER", "PERSON"], language='en')
+                                data["text"] = anonymizer.anonymize(text=val, analyzer_results=results).text
+                            else:
+                                data["text"] = scrub_text(val)
+                    fout.write(json.dumps(data) + "\n")
+                except Exception as e:
+                    fout.write(line)
 
     def train(self, dataset_path: Path, config: dict[str, Any]) -> TrainingResult:
         import torch
