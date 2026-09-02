@@ -220,11 +220,10 @@ export default function DataPrepPage() {
                       key={m.id}
                       type="button"
                       onClick={() => setMode(m.id)}
-                      className={`p-3 text-left border transition-all flex flex-col gap-1.5 ${
-                        isSelected
+                      className={`p-3 text-left border transition-all flex flex-col gap-1.5 ${isSelected
                           ? "border-[#00E5FF] bg-[#00E5FF]/10 text-white shadow-[0_0_10px_rgba(0,229,255,0.1)]"
                           : "border-[#252525] bg-[#121212] text-[#888888] hover:border-[#444444] hover:text-white"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-1.5">
                         <Icon size={14} className={isSelected ? "text-[#00E5FF]" : "text-[#777777]"} />
@@ -362,22 +361,20 @@ export default function DataPrepPage() {
                     <button
                       type="button"
                       onClick={() => setPreviewTab("cards")}
-                      className={`px-2.5 py-1 text-label-caps font-label-caps transition-colors flex items-center gap-1.5 border cursor-pointer ${
-                        previewTab === "cards"
+                      className={`px-2.5 py-1 text-label-caps font-label-caps transition-colors flex items-center gap-1.5 border cursor-pointer ${previewTab === "cards"
                           ? "border-[#00E5FF] bg-[#00E5FF]/15 text-[#00E5FF] font-bold"
                           : "border-[#252525] bg-[#141414] text-[#777777] hover:text-white"
-                      }`}
+                        }`}
                     >
                       <Eye size={12} /> CARDS VIEW
                     </button>
                     <button
                       type="button"
                       onClick={() => setPreviewTab("jsonl")}
-                      className={`px-2.5 py-1 text-label-caps font-label-caps transition-colors flex items-center gap-1.5 border cursor-pointer ${
-                        previewTab === "jsonl"
+                      className={`px-2.5 py-1 text-label-caps font-label-caps transition-colors flex items-center gap-1.5 border cursor-pointer ${previewTab === "jsonl"
                           ? "border-[#00E5FF] bg-[#00E5FF]/15 text-[#00E5FF] font-bold"
                           : "border-[#252525] bg-[#141414] text-[#777777] hover:text-white"
-                      }`}
+                        }`}
                     >
                       <Code size={12} /> RAW JSONL
                     </button>
@@ -442,9 +439,8 @@ export default function DataPrepPage() {
                             {item.conversations.map((c, cIdx) => (
                               <div key={cIdx} className="flex flex-col gap-0.5">
                                 <span
-                                  className={`text-[10px] font-bold ${
-                                    c.from === "human" ? "text-[#00E5FF]" : "text-emerald-400"
-                                  }`}
+                                  className={`text-[10px] font-bold ${c.from === "human" ? "text-[#00E5FF]" : "text-emerald-400"
+                                    }`}
                                 >
                                   {c.from === "human" ? "QUESTION:" : "RESPONSE:"}
                                 </span>

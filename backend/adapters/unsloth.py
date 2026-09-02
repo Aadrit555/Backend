@@ -459,7 +459,7 @@ class UnslothAdapter(BackendAdapter):
             "unsloth_qwen2.5_3b": "unsloth/Qwen2.5-3B-Instruct-bnb-4bit",
             "unsloth_llama3.2_1b": "unsloth/Llama-3.2-1B-Instruct-bnb-4bit"
         }
-        base_model_name = model_id_map.get(registry_model_name, "unsloth/Llama-3.2-3B-Instruct-bnb-4bit")
+        base_model_name = model_id_map.get(registry_model_name, registry_model_name)
         max_seq_length = config.get("max_seq_length", 512)
 
         def generate_for_model(model_id_or_path):

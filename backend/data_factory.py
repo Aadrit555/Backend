@@ -73,123 +73,101 @@ def clean_with_data_juicer(chunks: list[str]) -> list[str]:
         # Fallback to simple deduplication
         return list(set(chunks))
 
-def generate_with_distilabel(cleaned_chunks: list[str], openrouter_key: str) -> list[dict]:
-    """Step 3: Distilabel (instruction/response generation + LLM quality judging)"""
+def generate_with_distilabel(cleaned_chunks: list[str], api_key: str = "") -> list[dict]:
+    """Fast instruction/response pair generation with intelligent local fallback."""
     import os
-    print("[DATA FACTORY] Running Distilabel Generation and UltraFeedback Judging...")
+    import requests
+    import json
+    import re
+    
     qa_pairs = []
     
-    try:
-        import subprocess
-        import sys
-        import tempfile
-        
-        # Write chunks to a temp file
-        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json") as f:
-            json.dump(cleaned_chunks, f)
-            temp_in = f.name
-            
-        temp_out = temp_in.replace(".json", "_out.json")
-        
-        script = f"""
-import json
-import re
-import os
-
-with open("{temp_in}", "r") as f:
-    cleaned_chunks = json.load(f)
-
-from distilabel.llms import OpenAILLM
-from distilabel.pipeline import Pipeline
-from distilabel.steps import LoadDataFromDicts
-from distilabel.steps.tasks import TextGeneration
-
-qa_pairs = []
-try:
-    with Pipeline(name="QA_Generation") as pipeline:
-        loader = LoadDataFromDicts(
-            name="load_chunks",
-            data=[{{"instruction": f"Extract a conversational Q&A pair from this text. Return ONLY a JSON dictionary with 'q' and 'a'.\\nTEXT: {{c}}"}} for c in cleaned_chunks]
-        )
-        generator = TextGeneration(
-            name="generate_qa",
-            llm=OpenAILLM(
-                model=os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
-                base_url="https://api.groq.com/openai/v1",
-                api_key=os.environ.get("GROQ_API_KEY_1", ""),
-                generation_kwargs={"max_new_tokens": 2048}
-            ),
-        )
-        loader >> generator
-        
-    print("[DATA FACTORY] Executing Distilabel Pipeline DAG...")
-    distiset = pipeline.run(use_cache=False)
-    
-    if "default" in distiset and "train" in distiset["default"]:
-        for row in distiset["default"]["train"]:
-            output_text = row.get("generation", "")
-            try:
-                match = re.search(r'\\{{.*\\}}', output_text, re.DOTALL)
-                if match:
-                    pair = json.loads(match.group(0))
-                    if "q" in pair and "a" in pair:
-                        qa_pairs.append({{
-                            "conversations": [
-                                {{"from": "human", "value": pair["q"]}},
-                                {{"from": "gpt", "value": pair["a"]}}
-                            ]
-                        }})
-            except Exception:
-                pass
-finally:
-    with open("{temp_out}", "w") as f:
-        json.dump(qa_pairs, f)
-import os
-os._exit(0) # Force exit to prevent multiprocessing deadlocks
-"""
-        print("[DATA FACTORY] Running Distilabel Generation and UltraFeedback Judging...")
-        subprocess.run([sys.executable, "-c", script], check=True)
-        
-        with open(temp_out, "r") as f:
-            qa_pairs = json.load(f)
-            
-    except Exception as e:
-        print(f"[DATA FACTORY] Distilabel pipeline error: {e}")
-        print("[DATA FACTORY] Fallback to simple direct Groq API calls...")
-        import requests
-        import os
-        
-        groq_key = os.environ.get("GROQ_API_KEY_1", "")
-        for chunk in cleaned_chunks:
-            sys_prompt = "Extract 1 question-and-answer pair from the following text. Return ONLY a JSON object with 'q' and 'a' keys."
+    groq_key = os.environ.get("GROQ_API_KEY_1", "")
+    if groq_key:
+        print("[DATA FACTORY] Generating Q&A pairs via Groq LPU acceleration...")
+        for chunk in cleaned_chunks[:8]:
             try:
                 res = requests.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
                     json={
-                        "model": os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
+                        "model": "llama-3.1-8b-instant",
                         "messages": [
-                            {"role": "system", "content": sys_prompt},
-                            {"role": "user", "content": f"TEXT:\n{chunk}"}
+                            {"role": "system", "content": "Extract 1 question-and-answer pair from the text. Return ONLY JSON: {\"q\": \"...\", \"a\": \"...\"}"},
+                            {"role": "user", "content": f"TEXT:\n{chunk[:1500]}"}
                         ],
                         "temperature": 0.1
                     },
-                    timeout=30
+                    timeout=5
                 )
-                res_data = res.json().get('choices', [{}])[0].get('message', {}).get('content', '').strip()
-                import re
-                match = re.search(r'\{.*\}', res_data, re.DOTALL)
-                if match:
-                    pair = json.loads(match.group(0))
-                    if "q" in pair and "a" in pair:
-                        qa_pairs.append({
-                            "conversations": [
-                                {"from": "human", "value": pair["q"]},
-                                {"from": "gpt", "value": pair["a"]}
-                            ]
-                        })
+                if res.status_code == 200:
+                    data = res.json()
+                    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    match = re.search(r'\{.*\}', content, re.DOTALL)
+                    if match:
+                        pair = json.loads(match.group(0))
+                        if "q" in pair and "a" in pair:
+                            qa_pairs.append({
+                                "conversations": [
+                                    {"from": "human", "value": pair["q"]},
+                                    {"from": "gpt", "value": pair["a"]}
+                                ]
+                            })
             except Exception:
                 pass
+
+    elif api_key:
+        print("[DATA FACTORY] Generating Q&A pairs via OpenRouter...")
+        for chunk in cleaned_chunks[:8]:
+            try:
+                res = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": "google/gemini-2.0-flash-lite-preview-02-05:free",
+                        "messages": [
+                            {"role": "system", "content": "Extract 1 question-and-answer pair from the text. Return ONLY JSON: {\"q\": \"...\", \"a\": \"...\"}"},
+                            {"role": "user", "content": f"TEXT:\n{chunk[:1500]}"}
+                        ],
+                        "temperature": 0.1
+                    },
+                    timeout=5
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    match = re.search(r'\{.*\}', content, re.DOTALL)
+                    if match:
+                        pair = json.loads(match.group(0))
+                        if "q" in pair and "a" in pair:
+                            qa_pairs.append({
+                                "conversations": [
+                                    {"from": "human", "value": pair["q"]},
+                                    {"from": "gpt", "value": pair["a"]}
+                                ]
+                            })
+            except Exception:
+                pass
+
+    # Instant heuristic local generation fallback
+    if not qa_pairs:
+        print("[DATA FACTORY] Applying zero-latency heuristic Q&A extraction...")
+        for i, chunk in enumerate(cleaned_chunks[:15]):
+            lines = [line.strip() for line in chunk.split("\n") if line.strip()]
+            if not lines:
+                continue
+            heading = lines[0] if len(lines[0]) < 80 else f"Section {i+1}"
+            content = "\n".join(lines[1:]) if len(lines) > 1 else lines[0]
+            if len(content) < 20:
+                continue
+            qa_pairs.append({
+                "conversations": [
+                    {"from": "human", "value": f"What are the details regarding {heading}?"},
+                    {"from": "gpt", "value": content.strip()}
+                ]
+            })
+
+    return qa_pairs
                 
 def run_pipeline(raw_file: Path, output_jsonl: Path, mode: str = "qa") -> Path:
     """End-to-End Data Factory Pipeline supporting modes: 'qa', 'pii_clean', 'rag_chunks'."""
