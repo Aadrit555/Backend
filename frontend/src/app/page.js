@@ -1,7 +1,24 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { UploadCloud, CheckCircle2, DownloadCloud, Play, Sparkles, Search, X, Image as ImageIcon, Sliders } from "lucide-react";
+import {
+  UploadCloud,
+  CheckCircle2,
+  DownloadCloud,
+  Play,
+  Sparkles,
+  Search,
+  X,
+  Image as ImageIcon,
+  Sliders,
+  Table,
+  Cpu,
+  FileText,
+  Camera,
+  Layers,
+  ArrowRight,
+  Terminal,
+} from "lucide-react";
 import CustomVisionStudio from "../components/CustomVisionStudio";
 
 export default function BeginnerPage() {
@@ -12,7 +29,7 @@ export default function BeginnerPage() {
   }, []);
 
   const [modelCandidate, setModelCandidate] = useState("autogluon_best");
-  const [activeTab, setActiveTab] = useState("tabular");
+  const [activeTab, setActiveTab] = useState("vision");
   const [visionSubMode, setVisionSubMode] = useState("classifier"); // "classifier" | "detection"
   const [files, setFiles] = useState([]);
   const [manifest, setManifest] = useState(null);
@@ -52,13 +69,15 @@ export default function BeginnerPage() {
   const fileInputRef = useRef(null);
   const logsEndRef = useRef(null);
 
-  // Poll for status
+  // Time formatter
   const fmtTime = (iso) => {
     if (!iso) return "--:--:--.---";
     try {
       const d = new Date(iso);
-      return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
-    } catch { return iso; }
+      return d.toTimeString().split(" ")[0] + "." + String(d.getMilliseconds()).padStart(3, "0");
+    } catch {
+      return iso;
+    }
   };
 
   // Load imported models on mount
@@ -96,10 +115,18 @@ export default function BeginnerPage() {
     setVisionError(null);
 
     switch (activeTab) {
-      case "tabular": setModelCandidate("autogluon_best"); break;
-      case "llm": setModelCandidate("unsloth/Llama-3.2-1B-Instruct-bnb-4bit"); break;
-      case "rag": setModelCandidate("rag_default"); break;
-      case "vision": setModelCandidate("yolov8n"); break;
+      case "tabular":
+        setModelCandidate("autogluon_best");
+        break;
+      case "llm":
+        setModelCandidate("unsloth/Llama-3.2-1B-Instruct-bnb-4bit");
+        break;
+      case "rag":
+        setModelCandidate("rag_default");
+        break;
+      case "vision":
+        setModelCandidate("yolov8n");
+        break;
     }
   }, [activeTab]);
 
@@ -113,9 +140,9 @@ export default function BeginnerPage() {
         const data = await res.json();
 
         if (data.log && data.log.length > 0) {
-          setStatusLogs(prev => {
-            const frontendEntries = prev.filter(e => e._frontend);
-            const backendEntries = data.log.map(e => ({ ...e, _backend: true }));
+          setStatusLogs((prev) => {
+            const frontendEntries = prev.filter((e) => e._frontend);
+            const backendEntries = data.log.map((e) => ({ ...e, _backend: true }));
             return [...frontendEntries, ...backendEntries];
           });
         }
@@ -146,55 +173,53 @@ export default function BeginnerPage() {
       if (!res.ok) return;
       const data = await res.json();
 
-      const exp = data.experiments?.find(e => e.id === experimentId || true);
+      const exp = data.experiments?.find((e) => e.id === experimentId || true);
       if (exp) {
-        if (exp.metrics) setFinalMetrics(exp.metrics);
-        if (exp.backend) setExperimentBackend(exp.backend);
+        setExperimentBackend(exp.backend);
+        if (exp.metrics_json) {
+          try {
+            setFinalMetrics(JSON.parse(exp.metrics_json));
+          } catch (e) {}
+        }
       }
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
     }
   };
 
   const handleDragOver = (e) => {
     e.preventDefault();
-    e.currentTarget.classList.add("border-[#00E5FF]");
-    e.currentTarget.classList.remove("border-[#333333]");
   };
 
   const handleDragLeave = (e) => {
     e.preventDefault();
-    e.currentTarget.classList.remove("border-[#00E5FF]");
-    e.currentTarget.classList.add("border-[#333333]");
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
-    e.currentTarget.classList.remove("border-[#00E5FF]");
-    e.currentTarget.classList.add("border-[#333333]");
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFiles(Array.from(e.dataTransfer.files));
     }
   };
 
-  const handleFiles = async (selectedFiles) => {
-    setFiles(selectedFiles);
+  const handleFiles = async (newFiles) => {
+    setFiles(newFiles);
     setIsUploading(true);
 
     const formData = new FormData();
-    formData.append("project_id", projectId);
-    selectedFiles.forEach(f => formData.append("files", f));
+    newFiles.forEach((file) => formData.append("files", file));
 
     try {
-      const res = await fetch("http://localhost:8000/api/ingest", {
+      const res = await fetch(`http://localhost:8000/api/projects/${projectId}/upload`, {
         method: "POST",
         body: formData,
       });
+
       if (res.ok) {
         const data = await res.json();
         setManifest(data.manifest);
       } else {
-        alert("Upload failed.");
+        alert("Upload failed. Please try again.");
       }
     } catch (err) {
       console.error(err);
@@ -206,7 +231,15 @@ export default function BeginnerPage() {
 
   const handleBuild = async () => {
     setIsBuilding(true);
-    setStatusLogs([{ stage: "started", message: "Initiating expert build...", pct: 0, updated_at: new Date().toISOString(), _frontend: true }]);
+    setStatusLogs([
+      {
+        stage: "started",
+        message: "Initiating build...",
+        pct: 0,
+        updated_at: new Date().toISOString(),
+        _frontend: true,
+      },
+    ]);
 
     try {
       const res = await fetch("http://localhost:8000/api/expert_build", {
@@ -215,18 +248,45 @@ export default function BeginnerPage() {
         body: JSON.stringify({
           project_id: projectId,
           pipeline_type: activeTab,
-          expert_config: { model_candidates: [modelCandidate] }
-        })
+          expert_config: { model_candidates: [modelCandidate] },
+        }),
       });
       if (res.ok) {
-        setStatusLogs(prev => [...prev, { stage: "planning", message: "Build initialized. Starting execution...", pct: 0, updated_at: new Date().toISOString(), _frontend: true }]);
+        setStatusLogs((prev) => [
+          ...prev,
+          {
+            stage: "planning",
+            message: "Build initialized. Starting execution...",
+            pct: 0,
+            updated_at: new Date().toISOString(),
+            _frontend: true,
+          },
+        ]);
         pollForExperiment();
       } else {
-        setStatusLogs(prev => [...prev, { stage: "failed", message: "API error initiating expert build.", pct: 0, updated_at: new Date().toISOString(), _frontend: true }]);
+        setStatusLogs((prev) => [
+          ...prev,
+          {
+            stage: "failed",
+            message: "API error initiating build.",
+            pct: 0,
+            updated_at: new Date().toISOString(),
+            _frontend: true,
+          },
+        ]);
         setIsBuilding(false);
       }
     } catch (err) {
-      setStatusLogs(prev => [...prev, { stage: "failed", message: "Network error.", pct: 0, updated_at: new Date().toISOString(), _frontend: true }]);
+      setStatusLogs((prev) => [
+        ...prev,
+        {
+          stage: "failed",
+          message: "Network error.",
+          pct: 0,
+          updated_at: new Date().toISOString(),
+          _frontend: true,
+        },
+      ]);
       setIsBuilding(false);
     }
   };
@@ -235,7 +295,7 @@ export default function BeginnerPage() {
     e.preventDefault();
     if (!ragQuery.trim()) return;
 
-    setRagChat(prev => [...prev, { role: "user", content: ragQuery }]);
+    setRagChat((prev) => [...prev, { role: "user", content: ragQuery }]);
     setIsQuerying(true);
 
     try {
@@ -257,14 +317,23 @@ export default function BeginnerPage() {
       if (res.ok) {
         const data = await res.json();
         const msgContent = isLLM ? data.response : data.answer;
-        setRagChat(prev => [...prev, { role: "assistant", content: msgContent, citations: data.citations }]);
+        setRagChat((prev) => [
+          ...prev,
+          { role: "assistant", content: msgContent, citations: data.citations },
+        ]);
       } else {
         const errorData = await res.json().catch(() => ({}));
         const errorDetail = errorData.detail || `HTTP Error ${res.status}`;
-        setRagChat(prev => [...prev, { role: "assistant", content: `Error: ${errorDetail}` }]);
+        setRagChat((prev) => [
+          ...prev,
+          { role: "assistant", content: `Error: ${errorDetail}` },
+        ]);
       }
     } catch (err) {
-      setRagChat(prev => [...prev, { role: "assistant", content: `Network Error: ${err.message}` }]);
+      setRagChat((prev) => [
+        ...prev,
+        { role: "assistant", content: `Network Error: ${err.message}` },
+      ]);
     } finally {
       setIsQuerying(false);
       setRagQuery("");
@@ -275,9 +344,18 @@ export default function BeginnerPage() {
     let attempts = 0;
     const interval = setInterval(async () => {
       attempts++;
-      if (attempts > 120) { // 2 mins timeout
+      if (attempts > 120) {
         clearInterval(interval);
-        setStatusLogs(prev => [...prev, { stage: "failed", message: "Timeout waiting for orchestrator.", pct: 0, updated_at: new Date().toISOString(), _frontend: true }]);
+        setStatusLogs((prev) => [
+          ...prev,
+          {
+            stage: "failed",
+            message: "Timeout waiting for orchestrator.",
+            pct: 0,
+            updated_at: new Date().toISOString(),
+            _frontend: true,
+          },
+        ]);
         setIsBuilding(false);
         return;
       }
@@ -291,19 +369,36 @@ export default function BeginnerPage() {
             const exp = data.experiments[0];
             if (exp.status === "failed") {
               let errStr = "Unknown orchestration error";
-              try { errStr = JSON.parse(exp.config_json).error || errStr; } catch (e) { }
-              setStatusLogs(prev => [...prev, { stage: "failed", message: `Orchestrator Failed: ${errStr}`, pct: 0, _frontend: true }]);
+              try {
+                errStr = JSON.parse(exp.config_json).error || errStr;
+              } catch (e) {}
+              setStatusLogs((prev) => [
+                ...prev,
+                {
+                  stage: "failed",
+                  message: `Orchestrator Failed: ${errStr}`,
+                  pct: 0,
+                  _frontend: true,
+                },
+              ]);
               setIsBuilding(false);
             } else {
               setExperimentId(exp.id);
               setExperimentBackend(exp.backend);
-              setStatusLogs(prev => [...prev, { stage: "execution", message: `Experiment ${exp.id} created. Starting training...`, pct: 5, updated_at: new Date().toISOString(), _frontend: true }]);
+              setStatusLogs((prev) => [
+                ...prev,
+                {
+                  stage: "execution",
+                  message: `Experiment ${exp.id} created. Starting training...`,
+                  pct: 5,
+                  updated_at: new Date().toISOString(),
+                  _frontend: true,
+                },
+              ]);
             }
           }
         }
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     }, 2000);
   };
 
@@ -315,7 +410,9 @@ export default function BeginnerPage() {
     setHfError(null);
     try {
       const taskParam = hfTask ? `&task=${encodeURIComponent(hfTask)}` : "";
-      const res = await fetch(`http://localhost:8000/api/hf/search?query=${encodeURIComponent(hfQuery)}${taskParam}&limit=15`);
+      const res = await fetch(
+        `http://localhost:8000/api/hf/search?query=${encodeURIComponent(hfQuery)}${taskParam}&limit=15`
+      );
       if (res.ok) {
         const data = await res.json();
         setHfResults(data.models || []);
@@ -351,13 +448,13 @@ export default function BeginnerPage() {
         setHfError(err.detail || "Failed to import model.");
       }
     } catch (err) {
-      setHfError("Network error importing model: " + err.message);
+      setHfError("Network error during model import.");
     } finally {
       setHfImporting(false);
     }
   };
 
-  // Vision handlers
+  // Vision Inference Studio Handlers
   const handleVisionFileSelect = (file) => {
     if (!file) return;
     setVisionFile(file);
@@ -373,35 +470,28 @@ export default function BeginnerPage() {
     canvas.width = 640;
     canvas.height = 480;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
 
-    // Background
     ctx.fillStyle = "#1e293b";
     ctx.fillRect(0, 0, 640, 480);
-
-    // Road
     ctx.fillStyle = "#334155";
-    ctx.fillRect(0, 300, 640, 180);
+    ctx.fillRect(0, 320, 640, 160);
 
-    // Car body
+    ctx.fillStyle = "#e2e8f0";
+    for (let x = 40; x < 600; x += 100) {
+      ctx.fillRect(x, 395, 50, 10);
+    }
+
     ctx.fillStyle = "#ef4444";
-    ctx.fillRect(150, 240, 260, 100);
-    ctx.fillStyle = "#991b1b";
-    ctx.fillRect(190, 180, 180, 70);
+    ctx.fillRect(180, 260, 200, 90);
+    ctx.fillStyle = "#f87171";
+    ctx.fillRect(220, 200, 120, 60);
 
-    // Car windows
-    ctx.fillStyle = "#93c5fd";
-    ctx.fillRect(200, 190, 75, 50);
-    ctx.fillRect(285, 190, 75, 50);
-
-    // Car wheels
     ctx.fillStyle = "#0f172a";
     ctx.beginPath();
     ctx.arc(210, 340, 32, 0, Math.PI * 2);
     ctx.arc(350, 340, 32, 0, Math.PI * 2);
     ctx.fill();
 
-    // Pedestrian
     ctx.fillStyle = "#3b82f6";
     ctx.fillRect(490, 230, 30, 90);
     ctx.fillStyle = "#fde047";
@@ -448,134 +538,333 @@ export default function BeginnerPage() {
   };
 
   const TABS = [
-    { id: "tabular", num: "01", label: "TABULAR ML", desc: "Structured data prediction", placeholder: "e.g., 'Predict customer churn probability' or 'Maximize AUC-ROC'", fileHint: "CSV · XLSX · PARQUET" },
-    { id: "llm", num: "02", label: "LLM FINE-TUNING", desc: "Instruction tuning", placeholder: "e.g., 'Fine-tune a model to output strict JSON responses.'", fileHint: "JSONL" },
-    { id: "rag", num: "03", label: "RAG Q&A", desc: "Document intelligence", placeholder: "e.g., 'Create an index to answer questions about these PDFs.'", fileHint: "PDF · TXT · MD" },
-    { id: "vision", num: "04", label: "COMPUTER VISION", desc: "Image classification", placeholder: "e.g., 'Detect cars and pedestrians in images.'", fileHint: "ZIP · PNG · JPG" }
+    {
+      id: "vision",
+      label: "Computer Vision",
+      icon: Camera,
+      fileHint: "WEBCAM · JPG · PNG · ZIP",
+    },
+    {
+      id: "tabular",
+      label: "Tabular AutoML",
+      icon: Table,
+      fileHint: "CSV · XLSX · PARQUET",
+    },
+    {
+      id: "llm",
+      label: "LLM Fine-Tuning",
+      icon: Cpu,
+      fileHint: "JSONL",
+    },
+    {
+      id: "rag",
+      label: "RAG Assistant",
+      icon: FileText,
+      fileHint: "PDF · TXT · MD",
+    },
   ];
 
   return (
-    <div className="relative z-10 max-w-[1440px] mx-auto px-margin-desktop py-margin-desktop min-h-[calc(100vh-48px)] flex flex-col md:flex-row gap-16">
+    <div className="relative z-10 max-w-[1360px] mx-auto px-5 py-5 flex flex-col gap-5 text-[#E0E0E0]">
+      {/* Top Pipeline Bar */}
+      <div className="flex items-center justify-between border-b border-[#222222] pb-3 flex-wrap gap-3">
+        <div className="flex items-center gap-1.5 bg-[#0F0F0F] p-1 border border-[#222222] rounded-xs">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            const Icon = tab.icon;
 
-      <div className="w-full flex flex-col gap-12 mx-auto max-w-[1440px]">
-        {/* Hero Header */}
-        <header className="flex flex-col gap-4">
-          <span className="text-label-caps font-label-caps text-on-surface-variant">MODEL BUILDER / 01</span>
-          <div>
-            <h1 className="text-display-lg font-display-lg text-on-background mb-2">Build your model.</h1>
-            <p className="text-body-md font-body-md text-on-surface-variant max-w-xl">
-              Select your pipeline and provide your training data. We construct and tune the model architecture automatically.
-            </p>
-          </div>
-        </header>
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3.5 py-1.5 text-xs font-mono transition-all flex items-center gap-2 rounded-xs ${
+                  isActive
+                    ? "bg-[#1C1C1C] text-[#00E5FF] font-bold border border-[#333333] shadow-[0_0_12px_rgba(0,229,255,0.1)]"
+                    : "text-[#888888] hover:text-white hover:bg-[#161616] border border-transparent"
+                }`}
+              >
+                <Icon size={14} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
-        {/* Pipeline Selector */}
-        <section className="flex flex-col gap-6">
-          <h2 className="text-label-caps font-label-caps text-on-surface-variant border-b border-[#1A1A1A] pb-2">PIPELINE SELECTION</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {TABS.map(tab => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-col gap-2 p-4 bg-[#0A0A0A] border text-left transition-colors relative group ${isActive ? "border-[#00E5FF]" : "border-[#1A1A1A] hover:border-[#333333]"}`}
-                >
-                  {isActive && (
-                    <div className="absolute top-0 right-0 p-2 opacity-100">
-                      <div className="w-2 h-2 bg-[#00E5FF]"></div>
-                    </div>
-                  )}
-                  <span className={`text-label-caps font-label-caps transition-colors ${isActive ? "text-[#00E5FF]" : "text-on-surface-variant group-hover:text-on-background"}`}>
-                    {tab.num} {tab.label}
-                  </span>
-                  <span className={`text-code-sm font-code-sm transition-colors ${isActive ? "text-on-surface-variant group-hover:text-on-background" : "text-[#595959]"}`}>
-                    {tab.desc}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        <button
+          type="button"
+          onClick={() => {
+            setHfQuery(
+              activeTab === "vision"
+                ? "yolo"
+                : activeTab === "tabular"
+                ? "xgboost"
+                : "llama"
+            );
+            setHfTask(
+              activeTab === "vision"
+                ? "object-detection"
+                : activeTab === "llm"
+                ? "text-generation"
+                : ""
+            );
+            setShowHfModal(true);
+          }}
+          disabled={isBuilding}
+          className="px-3 py-1.5 text-xs font-mono bg-[#111111] hover:bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#00E5FF] text-[#AAAAAA] hover:text-[#00E5FF] transition-colors flex items-center gap-1.5"
+        >
+          <Search size={13} />
+          Hugging Face Hub
+        </button>
+      </div>
 
-        {/* Builder Form Area */}
-        <section className="bg-[#0A0A0A] border border-[#1A1A1A] flex flex-col">
-          {/* Model Section */}
-          <div className="p-6 border-b border-[#1A1A1A] flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-            <div className="w-48 flex-shrink-0">
-              <label className="text-label-caps font-label-caps text-on-surface-variant">RECOMMENDED MODEL</label>
+      {/* =================================================================== */}
+      {/* 1. COMPUTER VISION WORKSPACE                                        */}
+      {/* =================================================================== */}
+      {activeTab === "vision" && (
+        <div className="flex flex-col gap-4">
+          {/* Sub-mode Switcher */}
+          <div className="flex items-center justify-between border-b border-[#1E1E1E] pb-2 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setVisionSubMode("classifier")}
+                className={`px-3 py-1 text-xs font-mono transition-colors border ${
+                  visionSubMode === "classifier"
+                    ? "border-[#00E5FF] bg-[#00E5FF]/10 text-white font-bold"
+                    : "border-[#252525] bg-[#121212] text-[#888888] hover:text-white"
+                }`}
+              >
+                Custom Vision Classifier (In-House)
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisionSubMode("detection")}
+                className={`px-3 py-1 text-xs font-mono transition-colors border ${
+                  visionSubMode === "detection"
+                    ? "border-[#00E5FF] bg-[#00E5FF]/10 text-white font-bold"
+                    : "border-[#252525] bg-[#121212] text-[#888888] hover:text-white"
+                }`}
+              >
+                Object Detection (YOLOv8)
+              </button>
             </div>
 
-            <div className="flex-grow flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full">
-              <div className="flex-grow flex items-center justify-between border-b border-[#333333] pb-2 group hover:border-[#00E5FF] transition-colors cursor-pointer relative">
+            <span className="text-[11px] font-mono text-[#666666]">
+              {visionSubMode === "classifier"
+                ? "Sub-second PyTorch transfer learning on webcam or image data"
+                : "Ultralytics YOLOv8 inference with bounding box rendering"}
+            </span>
+          </div>
+
+          {/* Sub-mode Content */}
+          {visionSubMode === "classifier" ? (
+            <CustomVisionStudio />
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-[#1E1E1E] pb-2 flex-wrap gap-2">
+                <span className="text-xs font-mono text-[#AAAAAA] uppercase tracking-wider">
+                  YOLOv8 Object Detection Studio
+                </span>
+                <button
+                  type="button"
+                  onClick={handleVisionSample}
+                  disabled={isDetecting}
+                  className="text-xs font-mono px-3 py-1 border border-[#333333] hover:border-[#00E5FF] text-white hover:text-[#00E5FF] transition-colors flex items-center gap-1.5 bg-[#141414]"
+                >
+                  <Sparkles size={12} className="text-[#00E5FF]" />
+                  Load Sample Scene
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 bg-[#0F0F0F] border border-[#222222] p-5">
+                {/* Left Controls */}
+                <div className="flex flex-col gap-3">
+                  <div
+                    className="border border-dashed border-[#333333] hover:border-[#00E5FF] transition-colors bg-[#141414] p-6 flex flex-col items-center justify-center gap-3 cursor-pointer group min-h-[220px]"
+                    onClick={() => visionInputRef.current?.click()}
+                  >
+                    {visionPreview ? (
+                      <div className="text-center">
+                        <img
+                          src={visionPreview}
+                          alt="Test image"
+                          className="max-h-44 max-w-full border border-[#2A2A2A] object-contain mb-2 mx-auto"
+                        />
+                        <span className="text-xs font-mono text-[#777777] group-hover:text-[#00E5FF] transition-colors">
+                          Click to change image
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <UploadCloud
+                          size={28}
+                          className="text-[#666666] group-hover:text-[#00E5FF] transition-colors"
+                        />
+                        <div className="text-center flex flex-col gap-0.5">
+                          <span className="text-xs font-mono text-white">
+                            Drop test image here or click to browse
+                          </span>
+                          <span className="text-[11px] font-mono text-[#666666]">
+                            Supports JPG, PNG, WEBP
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      ref={visionInputRef}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleVisionFileSelect(e.target.files[0]);
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* Confidence Slider */}
+                  <div className="flex flex-col gap-1.5 p-3 bg-[#141414] border border-[#222222]">
+                    <div className="flex justify-between text-xs font-mono">
+                      <span className="text-[#888888] flex items-center gap-1.5">
+                        <Sliders size={12} className="text-[#00E5FF]" /> Confidence Threshold
+                      </span>
+                      <span className="text-[#00E5FF] font-bold">
+                        {(visionConf * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.05"
+                      max="0.95"
+                      step="0.05"
+                      value={visionConf}
+                      onChange={(e) => setVisionConf(parseFloat(e.target.value))}
+                      className="accent-[#00E5FF] cursor-pointer"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRunVisionInference}
+                    disabled={isDetecting || !visionFile}
+                    className="bg-[#00E5FF] text-black py-2.5 px-4 text-xs font-mono uppercase font-bold hover:bg-[#00cbe2] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isDetecting ? "DETECTING OBJECTS..." : "RUN OBJECT DETECTION"}
+                  </button>
+
+                  {visionError && (
+                    <div className="p-2 border border-red-800 bg-red-950/40 text-red-300 text-xs font-mono">
+                      {visionError}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Results */}
+                <div className="flex flex-col gap-3">
+                  <div className="border border-[#222222] bg-black min-h-[280px] flex items-center justify-center relative overflow-hidden">
+                    {visionResult?.annotated_image ? (
+                      <img
+                        src={`data:image/jpeg;base64,${visionResult.annotated_image}`}
+                        alt="YOLOv8 Detection"
+                        className="w-full h-full object-contain max-h-[350px]"
+                      />
+                    ) : (
+                      <div className="text-center p-4 flex flex-col items-center gap-1.5">
+                        <ImageIcon size={28} className="text-[#444444]" />
+                        <span className="text-xs font-mono text-[#666666]">
+                          Run detection to view bounding boxes
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {visionResult?.predictions && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {visionResult.predictions.map((p, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 bg-[#181818] border border-[#2D2D2D] text-xs font-mono text-[#00E5FF]"
+                        >
+                          {p.name} ({(p.confidence * 100).toFixed(0)}%)
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* 2. TABULAR, LLM, AND RAG WORKSPACE                                  */}
+      {/* =================================================================== */}
+      {activeTab !== "vision" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* Left Column: Model & Data Setup (7 cols) */}
+          <div className="lg:col-span-7 flex flex-col gap-4">
+            <div className="bg-[#0F0F0F] border border-[#222222] p-4 flex flex-col gap-4">
+              {/* Model Candidate Selector */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-mono text-[#888888] uppercase">
+                    Select Target Model
+                  </label>
+                  <span className="text-[10px] font-mono text-[#666666]">
+                    {TABS.find((t) => t.id === activeTab)?.fileHint}
+                  </span>
+                </div>
+
                 <select
                   value={modelCandidate}
                   onChange={(e) => setModelCandidate(e.target.value)}
                   disabled={isBuilding}
-                  className="w-full text-body-md font-body-md text-on-background appearance-none cursor-pointer outline-none border-none bg-transparent m-0 p-0 shadow-none focus:outline-none focus:ring-0 focus:border-none focus:shadow-none"
-                  style={{ borderBottom: "none" }}
+                  className="w-full bg-[#161616] border border-[#2D2D2D] focus:border-[#00E5FF] text-white px-3 py-2 text-xs font-mono outline-none cursor-pointer"
                 >
                   {activeTab === "tabular" && (
-                    <optgroup label="Tabular / AutoGluon">
-                      <option value="autogluon_best">AutoGluon Best</option>
+                    <optgroup label="AutoGluon Tabular Models">
+                      <option value="autogluon_best">AutoGluon Best (Automatic Ensemble)</option>
                     </optgroup>
                   )}
                   {activeTab === "llm" && (
                     <>
-                      <optgroup label="LLM / Unsloth Llama Series">
-                        <option value="unsloth/Llama-3.2-1B-Instruct-bnb-4bit">Llama 3.2 1B Instruct</option>
-                        <option value="unsloth/Llama-3.2-3B-Instruct-bnb-4bit">Llama 3.2 3B Instruct</option>
-                        <option value="unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit">Llama 3.1 8B Instruct</option>
-                        <option value="unsloth/Meta-Llama-3.1-70B-Instruct-bnb-4bit">Llama 3.1 70B Instruct</option>
-                        <option value="unsloth/Llama-3.3-70B-Instruct-bnb-4bit">Llama 3.3 70B Instruct</option>
+                      <optgroup label="Unsloth LLaMA 3 Series (4-bit QLoRA)">
+                        <option value="unsloth/Llama-3.2-1B-Instruct-bnb-4bit">
+                          LLaMA 3.2 1B Instruct (Fastest)
+                        </option>
+                        <option value="unsloth/Llama-3.2-3B-Instruct-bnb-4bit">
+                          LLaMA 3.2 3B Instruct (Recommended for 6GB VRAM)
+                        </option>
+                        <option value="unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit">
+                          LLaMA 3.1 8B Instruct
+                        </option>
                       </optgroup>
-                      <optgroup label="LLM / Unsloth DeepSeek Series">
-                        <option value="unsloth/DeepSeek-R1-Distill-Llama-8B-bnb-4bit">DeepSeek R1 (Distill Llama 8B)</option>
-                        <option value="unsloth/DeepSeek-R1-Distill-Qwen-1.5B-bnb-4bit">DeepSeek R1 (Distill Qwen 1.5B)</option>
-                        <option value="unsloth/DeepSeek-R1-Distill-Qwen-7B-bnb-4bit">DeepSeek R1 (Distill Qwen 7B)</option>
-                        <option value="unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit">DeepSeek R1 (Distill Qwen 14B)</option>
-                        <option value="unsloth/DeepSeek-R1-Distill-Qwen-32B-bnb-4bit">DeepSeek R1 (Distill Qwen 32B)</option>
-                      </optgroup>
-                      <optgroup label="LLM / Unsloth Qwen Series">
-                        <option value="unsloth/Qwen2.5-0.5B-Instruct-bnb-4bit">Qwen 2.5 0.5B Instruct</option>
-                        <option value="unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit">Qwen 2.5 1.5B Instruct</option>
-                        <option value="unsloth/Qwen2.5-3B-Instruct-bnb-4bit">Qwen 2.5 3B Instruct</option>
-                        <option value="unsloth/Qwen2.5-7B-Instruct-bnb-4bit">Qwen 2.5 7B Instruct</option>
-                        <option value="unsloth/Qwen2.5-14B-Instruct-bnb-4bit">Qwen 2.5 14B Instruct</option>
-                        <option value="unsloth/Qwen2.5-32B-Instruct-bnb-4bit">Qwen 2.5 32B Instruct</option>
-                        <option value="unsloth/Qwen2.5-72B-Instruct-bnb-4bit">Qwen 2.5 72B Instruct</option>
-                      </optgroup>
-                      <optgroup label="LLM / Unsloth Coder Series">
-                        <option value="unsloth/Qwen2.5-Coder-1.5B-Instruct-bnb-4bit">Qwen 2.5 Coder 1.5B Instruct</option>
-                        <option value="unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit">Qwen 2.5 Coder 7B Instruct</option>
-                        <option value="unsloth/Qwen2.5-Coder-32B-Instruct-bnb-4bit">Qwen 2.5 Coder 32B Instruct</option>
-                        <option value="unsloth/Llama-3-8B-Instruct-Coder-bnb-4bit">Llama 3 8B Coder</option>
-                      </optgroup>
-                      <optgroup label="LLM / Unsloth Mistral & Gemma & Phi">
-                        <option value="unsloth/mistral-7b-instruct-v0.3-bnb-4bit">Mistral 7B Instruct v0.3</option>
-                        <option value="unsloth/Mistral-Nemo-Instruct-2407-bnb-4bit">Mistral Nemo 12B Instruct</option>
-                        <option value="unsloth/gemma-2-2b-it-bnb-4bit">Gemma 2 2B Instruct</option>
-                        <option value="unsloth/gemma-2-9b-it-bnb-4bit">Gemma 2 9B Instruct</option>
-                        <option value="unsloth/gemma-2-27b-it-bnb-4bit">Gemma 2 27B Instruct</option>
-                        <option value="unsloth/Phi-3.5-mini-instruct-bnb-4bit">Phi 3.5 Mini Instruct</option>
+                      <optgroup label="Unsloth Qwen 2.5 Series (4-bit QLoRA)">
+                        <option value="unsloth/Qwen2.5-0.5B-Instruct-bnb-4bit">
+                          Qwen 2.5 0.5B Instruct
+                        </option>
+                        <option value="unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit">
+                          Qwen 2.5 1.5B Instruct
+                        </option>
+                        <option value="unsloth/Qwen2.5-3B-Instruct-bnb-4bit">
+                          Qwen 2.5 3B Instruct
+                        </option>
+                        <option value="unsloth/Qwen2.5-7B-Instruct-bnb-4bit">
+                          Qwen 2.5 7B Instruct
+                        </option>
                       </optgroup>
                     </>
                   )}
                   {activeTab === "rag" && (
-                    <optgroup label="RAG / Document Q&A">
-                      <option value="rag_default">RAG Index (FAISS + Embeddings)</option>
-                    </optgroup>
-                  )}
-                  {activeTab === "vision" && (
-                    <optgroup label="Computer Vision / YOLOv8 & HF">
-                      <option value="yolov8n">YOLOv8 Nano (Fastest, Edge Real-time)</option>
-                      <option value="yolov8s">YOLOv8 Small (Balanced Speed/Accuracy)</option>
-                      <option value="yolov8m">YOLOv8 Medium (High Accuracy Detection)</option>
-                      <option value="autotrain_vision">HF AutoTrain (Vision Transformers)</option>
+                    <optgroup label="Vector Search & Retrieval">
+                      <option value="rag_default">FAISS Index (all-MiniLM-L6-v2)</option>
                     </optgroup>
                   )}
                   {importedModels.length > 0 && (
-                    <optgroup label="Imported from Hugging Face Hub">
+                    <optgroup label="Hugging Face Hub Imports">
                       {importedModels.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.id} [{m.tasks?.[0] || m.pipeline_type || "custom"}]
@@ -584,506 +873,280 @@ export default function BeginnerPage() {
                     </optgroup>
                   )}
                 </select>
-                <span className="absolute right-0 top-1/2 -translate-y-1/2 text-label-caps font-label-caps text-on-surface-variant group-hover:text-[#00E5FF] transition-colors pointer-events-none bg-[#0A0A0A] pl-2">
-                  [ SELECT ↓ ]
+              </div>
+
+              {/* Training Dataset Upload */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-mono text-[#888888] uppercase">
+                  Dataset Input
+                </label>
+
+                {!manifest ? (
+                  <div
+                    className="border border-dashed border-[#333333] hover:border-[#00E5FF] transition-colors bg-[#141414] p-8 flex flex-col items-center justify-center gap-2 cursor-pointer group"
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <UploadCloud
+                      size={24}
+                      className="text-[#666666] group-hover:text-[#00E5FF] transition-colors"
+                    />
+                    <span className="text-xs font-mono text-white">
+                      {isUploading ? "Uploading files..." : "Drag & drop files or click to browse"}
+                    </span>
+                    <span className="text-[11px] font-mono text-[#666666]">
+                      {TABS.find((t) => t.id === activeTab)?.fileHint}
+                    </span>
+                    <input
+                      type="file"
+                      multiple
+                      hidden
+                      ref={fileInputRef}
+                      onChange={(e) => handleFiles(Array.from(e.target.files))}
+                    />
+                  </div>
+                ) : (
+                  <div className="border border-[#222222] bg-[#141414] overflow-hidden">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="border-b border-[#222222] bg-[#0E0E0E] text-[#777777]">
+                        <tr>
+                          <th className="p-2.5">FILE</th>
+                          <th className="p-2.5">TYPE</th>
+                          <th className="p-2.5">SIZE</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {manifest.map((item, i) => (
+                          <tr
+                            key={i}
+                            className="border-b border-[#1C1C1C] last:border-b-0 hover:bg-[#1A1A1A] transition-colors"
+                          >
+                            <td className="p-2.5 text-white flex items-center gap-1.5">
+                              <CheckCircle2 size={12} className="text-[#00E5FF]" />
+                              {item.filename}
+                            </td>
+                            <td className="p-2.5 text-[#888888]">{item.file_type}</td>
+                            <td className="p-2.5 text-[#666666]">
+                              {(item.size_bytes / 1024).toFixed(1)} KB
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Button */}
+              <button
+                type="button"
+                onClick={handleBuild}
+                disabled={!manifest || isBuilding}
+                className="w-full bg-[#00E5FF] hover:bg-[#00cbe2] text-black py-2.5 px-4 text-xs font-mono uppercase font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(0,229,255,0.15)]"
+              >
+                {isBuilding ? "EXECUTING PIPELINE..." : "START MODEL BUILD"}
+                <ArrowRight size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column: Terminal Logs & Results (5 cols) */}
+          <div className="lg:col-span-5 flex flex-col gap-4">
+            {/* Terminal Log */}
+            <div className="border border-[#222222] bg-[#0B0B0B] p-3 flex flex-col gap-2 min-h-[260px] max-h-[380px]">
+              <div className="flex items-center justify-between border-b border-[#1E1E1E] pb-1.5">
+                <span className="text-[11px] font-mono text-[#888888] flex items-center gap-1.5">
+                  <Terminal size={12} className="text-[#00E5FF]" /> EXECUTION LOGS
+                </span>
+                <span className="text-[10px] font-mono text-[#555555]">
+                  {statusLogs.length} events
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setHfQuery(activeTab === "vision" ? "yolo" : activeTab === "tabular" ? "xgboost" : "llama");
-                  setHfTask(activeTab === "vision" ? "object-detection" : activeTab === "llm" ? "text-generation" : "");
-                  setShowHfModal(true);
-                }}
-                disabled={isBuilding}
-                className="shrink-0 text-label-caps font-label-caps px-3.5 py-2 border border-[#333333] hover:border-[#00E5FF] hover:text-[#00E5FF] text-on-surface-variant transition-colors flex items-center justify-center gap-1.5 bg-[#131313]"
-                title="Search and import models directly from Hugging Face Hub"
-              >
-                <Sparkles size={13} className="text-[#00E5FF]" />
-                [ SEARCH HF HUB ]
-              </button>
-            </div>
-          </div>
-
-          {/* Dataset Section */}
-          <div className="p-6 border-b border-[#1A1A1A] flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <label className="text-label-caps font-label-caps text-on-surface-variant">TRAINING DATASET</label>
-              <span className="text-code-sm font-code-sm text-[#595959]">{TABS.find(t => t.id === activeTab).fileHint}</span>
-            </div>
-
-            {!manifest ? (
-              <div
-                className="border border-dashed border-[#333333] hover:border-[#00E5FF] transition-colors bg-[#131313] p-12 flex flex-col items-center justify-center gap-4 cursor-pointer group"
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <span className="material-symbols-outlined text-4xl text-[#595959] group-hover:text-[#00E5FF] transition-colors" data-icon="cloud_upload">cloud_upload</span>
-                <div className="text-center flex flex-col gap-1">
-                  <span className="text-body-md font-body-md text-on-background">
-                    {isUploading ? "Uploading..." : "Drop your dataset here"}
-                  </span>
-                  <span className="text-code-sm font-code-sm text-[#595959]">or click to browse local files</span>
-                </div>
-                <button className="mt-4 px-6 py-2 border border-[#1A1A1A] text-label-caps font-label-caps text-on-background hover:border-[#00E5FF] transition-colors">
-                  [ BROWSE FILES ]
-                </button>
-                <input
-                  type="file"
-                  multiple
-                  hidden
-                  ref={fileInputRef}
-                  onChange={(e) => handleFiles(Array.from(e.target.files))}
-                />
-              </div>
-            ) : (
-              <div className="border border-[#1A1A1A] bg-[#131313] w-full">
-                <table className="w-full text-left">
-                  <thead className="border-b border-[#1A1A1A] bg-[#0A0A0A]">
-                    <tr>
-                      <th className="p-3 text-label-caps font-label-caps text-[#595959]">FILENAME</th>
-                      <th className="p-3 text-label-caps font-label-caps text-[#595959]">TYPE</th>
-                      <th className="p-3 text-label-caps font-label-caps text-[#595959]">SIZE</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {manifest.map((item, i) => (
-                      <tr key={i} className="border-b border-[#1A1A1A] last:border-b-0 hover:bg-[#1f1f1f] transition-colors">
-                        <td className="p-3 text-code-sm font-code-sm text-on-background flex items-center gap-2">
-                          <CheckCircle2 size={14} className="text-[#00E5FF]" />
-                          {item.filename}
-                        </td>
-                        <td className="p-3">
-                          <span className="text-label-caps font-label-caps px-2 py-1 bg-[#1A1A1A] text-on-surface-variant border border-[#333333]">
-                            {item.file_type}
-                          </span>
-                        </td>
-                        <td className="p-3 text-code-sm font-code-sm text-[#595959]">
-                          {(item.size_bytes / 1024).toFixed(1)} KB
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-        </section>
-
-        {/* Action Area */}
-        <div className="flex justify-end pt-4">
-          <button
-            className="bg-[#00E5FF] text-black px-8 py-3 text-label-caps font-label-caps font-bold hover:bg-white hover:text-black transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleBuild}
-            disabled={!manifest || isBuilding}
-          >
-            {isBuilding ? "BUILDING..." : "BUILD MODEL"} <span className="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
-          </button>
-        </div>
-
-        {/* Status Logs (Brutalist Terminal) */}
-        {statusLogs.length > 0 && (
-          <section className="flex flex-col gap-4 mt-8">
-            <h2 className="text-label-caps font-label-caps text-on-surface-variant border-b border-[#1A1A1A] pb-2">PIPELINE EXECUTION LOG</h2>
-            <div className="bg-[#0e0e0e] border border-[#1A1A1A] p-4 h-64 overflow-y-auto">
-              {statusLogs.map((log, idx) => (
-                <div key={idx} className="flex gap-4 mb-2 text-code-sm font-code-sm">
-                  <span className="text-[#595959] shrink-0">{fmtTime(log.updated_at)}</span>
-                  <span className={`shrink-0 w-24 uppercase ${log.stage === "failed" ? "text-error" : "text-on-surface-variant"}`}>
-                    [{log.stage}]
-                  </span>
-                  <span className={log.stage === "completed" ? "text-[#00E5FF]" : "text-on-background"}>
-                    {log.message}
-                  </span>
-                  {log.pct > 0 && <span className="text-[#00E5FF] shrink-0">{log.pct}%</span>}
-                </div>
-              ))}
-              <div ref={logsEndRef} />
-            </div>
-          </section>
-        )}
-
-        {/* Results & Chat */}
-        {finalMetrics && finalMetrics.leaderboard && (
-          <section className="flex flex-col gap-4 mt-8">
-            <div className="flex justify-between items-end border-b border-[#1A1A1A] pb-2">
-              <h2 className="text-label-caps font-label-caps text-on-surface-variant">TRAINING RESULTS</h2>
-              <a
-                href={`http://localhost:8000/api/experiments/${experimentId}/download`}
-                className="text-label-caps font-label-caps text-[#00E5FF] hover:text-white transition-colors flex items-center gap-1"
-                download
-              >
-                [ DOWNLOAD MODEL ]
-              </a>
-            </div>
-
-            <div className="border border-[#1A1A1A] bg-[#0e0e0e] w-full">
-              <table className="w-full text-left">
-                <thead className="border-b border-[#1A1A1A] bg-[#131313]">
-                  <tr>
-                    <th className="p-3 text-label-caps font-label-caps text-[#595959]">MODEL</th>
-                    <th className="p-3 text-label-caps font-label-caps text-[#595959]">SCORE</th>
-                    <th className="p-3 text-label-caps font-label-caps text-[#595959]">FIT TIME (S)</th>
-                    <th className="p-3 text-label-caps font-label-caps text-[#595959]">PRED TIME (S)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {finalMetrics.leaderboard
-                    .sort((a, b) => b.score - a.score)
-                    .map((row, i) => (
-                      <tr key={i} className={`border-b border-[#1A1A1A] last:border-b-0 ${row.is_best ? "bg-[#00363d]/30" : "hover:bg-[#1f1f1f]"}`}>
-                        <td className="p-3 text-code-sm font-code-sm text-on-background flex items-center gap-2">
-                          {row.is_best && <div className="w-2 h-2 bg-[#00E5FF]"></div>}
-                          {row.model_name}
-                        </td>
-                        <td className="p-3 text-code-sm font-code-sm text-[#00E5FF]">{row.score.toFixed(4)}</td>
-                        <td className="p-3 text-code-sm font-code-sm text-[#595959]">{row.fit_time.toFixed(2)}</td>
-                        <td className="p-3 text-code-sm font-code-sm text-[#595959]">{row.pred_time.toFixed(4)}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
-        {/* Inference / Chat UI */}
-        {(experimentBackend === "unsloth" || (finalMetrics && finalMetrics.retrieval_accuracy !== undefined)) && (
-          <section className="flex flex-col gap-4 mt-8 mb-24">
-            <h2 className="text-label-caps font-label-caps text-on-surface-variant border-b border-[#1A1A1A] pb-2">
-              {experimentBackend === "unsloth" ? "INFERENCE ENDPOINT" : "RAG ENDPOINT"}
-            </h2>
-
-            <div className="bg-[#0e0e0e] border border-[#1A1A1A] p-6 flex flex-col min-h-[400px]">
-              <div className="flex-1 overflow-y-auto mb-4 flex flex-col gap-6">
-                {ragChat.length === 0 && (
-                  <div className="text-code-sm font-code-sm text-[#595959] italic text-center mt-10">
-                    Endpoint active. Awaiting input...
+              <div className="flex-1 overflow-y-auto flex flex-col gap-1 text-[11px] font-mono">
+                {statusLogs.length === 0 ? (
+                  <div className="text-center text-[#555555] py-12">
+                    Logs will stream here during pipeline execution.
                   </div>
-                )}
-
-                {ragChat.map((msg, i) => (
-                  <div key={i} className="flex flex-col gap-1">
-                    <span className={`text-label-caps font-label-caps ${msg.role === "user" ? "text-on-surface-variant" : "text-[#00E5FF]"}`}>
-                      {msg.role === "user" ? "INPUT_QUERY" : "MODEL_OUTPUT"}
-                    </span>
-                    <div className="text-body-md font-body-md text-on-background whitespace-pre-wrap">
-                      {msg.content}
+                ) : (
+                  statusLogs.map((log, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <span className="text-[#555555] shrink-0">{fmtTime(log.updated_at)}</span>
+                      <span
+                        className={`shrink-0 ${
+                          log.stage === "failed"
+                            ? "text-red-400 font-bold"
+                            : log.stage === "completed"
+                            ? "text-[#00E5FF] font-bold"
+                            : "text-[#888888]"
+                        }`}
+                      >
+                        [{log.stage}]
+                      </span>
+                      <span className="text-white break-all">{log.message}</span>
                     </div>
-                    {msg.citations && msg.citations.length > 0 && (
-                      <div className="mt-2 pl-4 border-l border-[#333333] flex flex-col gap-1">
-                        <span className="text-label-caps font-label-caps text-[#595959]">CONTEXT CITATIONS</span>
-                        <ul className="list-none m-0 p-0 text-code-sm font-code-sm text-[#595959]">
-                          {msg.citations.map((c, idx) => (
-                            <li key={idx}>
-                              [{idx + 1}] {c.metadata.source} {c.metadata.page ? `(Page ${c.metadata.page})` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {isQuerying && (
-                  <div className="text-code-sm font-code-sm text-[#00E5FF] animate-pulse">
-                    Processing request...
-                  </div>
+                  ))
                 )}
+                <div ref={logsEndRef} />
               </div>
-
-              <form onSubmit={handleChatSubmit} className="flex gap-4 border-t border-[#1A1A1A] pt-4">
-                <input
-                  type="text"
-                  value={ragQuery}
-                  onChange={e => setRagQuery(e.target.value)}
-                  placeholder="Enter query..."
-                  disabled={isQuerying}
-                  className="flex-1 bg-transparent border-none border-b border-[#333333] text-body-md font-body-md text-on-background p-2 focus:border-[#00E5FF] focus:outline-none transition-colors"
-                />
-                <button
-                  type="submit"
-                  disabled={isQuerying || !ragQuery.trim()}
-                  className="bg-transparent border border-[#333333] text-on-surface-variant px-6 py-2 text-label-caps font-label-caps hover:border-[#00E5FF] hover:text-[#00E5FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  [ SEND ]
-                </button>
-              </form>
-            </div>
-          </section>
-        )}
-
-        {/* Computer Vision Section */}
-        {(experimentBackend === "ultralytics" || activeTab === "vision") && (
-          <section className="flex flex-col gap-6 mt-8 mb-24">
-            {/* Vision Sub-Mode Switcher */}
-            <div className="flex border-b border-[#1A1A1A] gap-6 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setVisionSubMode("classifier")}
-                className={`pb-3 text-label-caps font-label-caps border-b-2 transition-colors flex items-center gap-2 ${visionSubMode === "classifier" || visionSubMode === "teachable"
-                    ? "border-[#00E5FF] text-[#00E5FF]"
-                    : "border-transparent text-on-surface-variant hover:text-on-background"
-                  }`}
-              >
-                <Sparkles size={14} className={visionSubMode === "classifier" || visionSubMode === "teachable" ? "text-[#00E5FF]" : "text-[#595959]"} />
-                CUSTOM VISION CLASSIFIER (IN-HOUSE)
-              </button>
-              <button
-                type="button"
-                onClick={() => setVisionSubMode("detection")}
-                className={`pb-3 text-label-caps font-label-caps border-b-2 transition-colors flex items-center gap-2 ${visionSubMode === "detection"
-                    ? "border-[#00E5FF] text-[#00E5FF]"
-                    : "border-transparent text-on-surface-variant hover:text-on-background"
-                  }`}
-              >
-                <ImageIcon size={14} className={visionSubMode === "detection" ? "text-[#00E5FF]" : "text-[#595959]"} />
-                OBJECT DETECTION (YOLOV8 STUDIO)
-              </button>
             </div>
 
-            {visionSubMode === "classifier" || visionSubMode === "teachable" ? (
-              <CustomVisionStudio />
-            ) : (
-              <div className="flex flex-col gap-4">
-                <div className="flex justify-between items-end border-b border-[#1A1A1A] pb-2 flex-wrap gap-2">
-                  <div>
-                    <h2 className="text-label-caps font-label-caps text-on-surface-variant">
-                      COMPUTER VISION INFERENCE STUDIO (YOLOV8)
-                    </h2>
-                    <p className="text-code-sm font-code-sm text-[#595959] mt-1">
-                      Upload test images or run sample detection with confidence threshold control.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleVisionSample}
-                    disabled={isDetecting}
-                    className="text-label-caps font-label-caps px-3 py-1.5 border border-[#333333] hover:border-[#00E5FF] text-on-surface-variant hover:text-[#00E5FF] transition-colors flex items-center gap-1.5 bg-[#131313]"
+            {/* Results Leaderboard */}
+            {finalMetrics?.leaderboard && (
+              <div className="border border-[#222222] bg-[#0F0F0F] p-3 flex flex-col gap-2">
+                <div className="flex justify-between items-center border-b border-[#1E1E1E] pb-1.5">
+                  <span className="text-xs font-mono text-[#AAAAAA] uppercase">
+                    Leaderboard
+                  </span>
+                  <a
+                    href={`http://localhost:8000/api/experiments/${experimentId}/download`}
+                    className="text-xs font-mono text-[#00E5FF] hover:underline flex items-center gap-1"
+                    download
                   >
-                    <Sparkles size={13} className="text-[#00E5FF]" />
-                    [ TRY SAMPLE TEST IMAGE ]
-                  </button>
+                    <DownloadCloud size={12} /> Download
+                  </a>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-[#0A0A0A] border border-[#1A1A1A] p-6">
-                  {/* Controls Column */}
-                  <div className="flex flex-col gap-4">
-                    <div
-                      className="border border-dashed border-[#333333] hover:border-[#00E5FF] transition-colors bg-[#131313] p-6 flex flex-col items-center justify-center gap-3 cursor-pointer group min-h-[220px]"
-                      onClick={() => visionInputRef.current?.click()}
-                    >
-                      {visionPreview ? (
-                        <div className="text-center">
-                          <img
-                            src={visionPreview}
-                            alt="Test image"
-                            className="max-h-48 max-w-full rounded border border-[#1A1A1A] object-contain mb-2 mx-auto"
-                          />
-                          <span className="text-code-sm font-code-sm text-[#595959] group-hover:text-[#00E5FF] transition-colors">
-                            Click to change image
-                          </span>
-                        </div>
-                      ) : (
-                        <>
-                          <UploadCloud size={32} className="text-[#595959] group-hover:text-[#00E5FF] transition-colors" />
-                          <div className="text-center flex flex-col gap-1">
-                            <span className="text-body-md font-body-md text-on-background">
-                              Drop test image here or browse
-                            </span>
-                            <span className="text-code-sm font-code-sm text-[#595959]">Supports JPG, PNG, WEBP</span>
-                          </div>
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        ref={visionInputRef}
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            handleVisionFileSelect(e.target.files[0]);
-                          }
-                        }}
-                      />
-                    </div>
-
-                    {/* Confidence Threshold & Action */}
-                    <div className="flex flex-col gap-2 p-4 bg-[#131313] border border-[#1A1A1A]">
-                      <div className="flex justify-between text-label-caps font-label-caps">
-                        <span className="text-on-surface-variant flex items-center gap-1.5">
-                          <Sliders size={13} className="text-[#00E5FF]" /> CONFIDENCE THRESHOLD
-                        </span>
-                        <span className="text-[#00E5FF] font-code-sm font-code-sm">{(visionConf * 100).toFixed(0)}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0.05"
-                        max="0.95"
-                        step="0.05"
-                        value={visionConf}
-                        onChange={(e) => setVisionConf(parseFloat(e.target.value))}
-                        className="accent-[#00E5FF] cursor-pointer"
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleRunVisionInference}
-                      disabled={isDetecting || !visionFile}
-                      className="bg-[#00E5FF] text-black py-3 text-label-caps font-label-caps font-bold hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {isDetecting ? "DETECTING OBJECTS..." : "[ RUN OBJECT DETECTION ]"}
-                    </button>
-
-                    {visionError && (
-                      <div className="p-3 border border-red-800 bg-red-950/40 text-red-400 text-code-sm font-code-sm">
-                        {visionError}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Output Column */}
-                  <div className="flex flex-col bg-[#0e0e0e] border border-[#1A1A1A] p-4 min-h-[300px]">
-                    <div className="flex justify-between items-center border-b border-[#1A1A1A] pb-3 mb-3">
-                      <span className="text-label-caps font-label-caps text-on-surface-variant">DETECTION VISUALIZATION</span>
-                      {visionResult && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-label-caps font-label-caps px-2 py-0.5 bg-[#00363d] text-[#00E5FF] border border-[#00626e]">
-                            {visionResult.count} {visionResult.count === 1 ? "OBJECT" : "OBJECTS"}
-                          </span>
-                          {visionResult.speed_ms?.inference && (
-                            <span className="text-code-sm font-code-sm text-[#595959]">
-                              {visionResult.speed_ms.inference.toFixed(1)}ms
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex-1 flex items-center justify-center">
-                      {visionResult?.annotated_image ? (
-                        <img
-                          src={visionResult.annotated_image}
-                          alt="Detection Results"
-                          className="max-h-72 max-w-full object-contain rounded border border-[#1A1A1A]"
-                        />
-                      ) : (
-                        <div className="text-center text-code-sm font-code-sm text-[#595959] p-8">
-                          {isDetecting ? "Running YOLOv8 inference..." : "Upload an image and run detection to view bounding boxes"}
-                        </div>
-                      )}
-                    </div>
-
-                    {visionResult?.detections && visionResult.detections.length > 0 && (
-                      <div className="border-t border-[#1A1A1A] pt-3 mt-3 flex flex-col gap-2">
-                        <span className="text-label-caps font-label-caps text-[#595959]">DETECTED LABELS:</span>
-                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                          {visionResult.detections.map((d, idx) => (
-                            <span
-                              key={idx}
-                              className="px-2.5 py-1 bg-[#131313] border border-[#333333] text-code-sm font-code-sm text-on-background flex items-center gap-2"
-                            >
-                              <span className="text-[#00E5FF] font-semibold">{d.class}</span>
-                              <span className="text-[#595959]">{(d.confidence * 100).toFixed(1)}%</span>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="border-b border-[#1E1E1E] text-[#666666]">
+                      <tr>
+                        <th className="p-1.5">MODEL</th>
+                        <th className="p-1.5">SCORE</th>
+                        <th className="p-1.5">FIT (S)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {finalMetrics.leaderboard.map((row, i) => (
+                        <tr
+                          key={i}
+                          className={`border-b border-[#1C1C1C] ${
+                            row.is_best ? "text-[#00E5FF] font-bold" : "text-[#888888]"
+                          }`}
+                        >
+                          <td className="p-1.5">{row.model_name}</td>
+                          <td className="p-1.5">{row.score.toFixed(4)}</td>
+                          <td className="p-1.5">{row.fit_time.toFixed(1)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
-          </section>
-        )}
 
-      </div>
+            {/* Interactive Chat / Inference */}
+            {(experimentBackend === "unsloth" || finalMetrics?.retrieval_accuracy !== undefined) && (
+              <div className="border border-[#222222] bg-[#0F0F0F] p-3 flex flex-col gap-2">
+                <span className="text-xs font-mono text-[#AAAAAA] uppercase">
+                  {experimentBackend === "unsloth" ? "Model Chat" : "RAG Assistant"}
+                </span>
+
+                <div className="min-h-[160px] max-h-[220px] overflow-y-auto flex flex-col gap-2 p-2 bg-black border border-[#1E1E1E] text-xs font-mono">
+                  {ragChat.map((msg, i) => (
+                    <div key={i} className="flex flex-col gap-0.5">
+                      <span
+                        className={`text-[10px] font-bold ${
+                          msg.role === "user" ? "text-[#777777]" : "text-[#00E5FF]"
+                        }`}
+                      >
+                        {msg.role === "user" ? "YOU" : "MODEL"}
+                      </span>
+                      <div className="text-white whitespace-pre-wrap">{msg.content}</div>
+                    </div>
+                  ))}
+                  {isQuerying && (
+                    <div className="text-[#00E5FF] animate-pulse">Generating response...</div>
+                  )}
+                </div>
+
+                <form onSubmit={handleChatSubmit} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={ragQuery}
+                    onChange={(e) => setRagQuery(e.target.value)}
+                    placeholder="Ask model a question..."
+                    disabled={isQuerying}
+                    className="flex-1 bg-[#141414] border border-[#2D2D2D] focus:border-[#00E5FF] text-white px-2.5 py-1.5 text-xs font-mono outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isQuerying || !ragQuery.trim()}
+                    className="px-3 py-1.5 bg-[#00E5FF] text-black text-xs font-mono font-bold hover:bg-[#00cbe2] transition-colors disabled:opacity-40"
+                  >
+                    SEND
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Hugging Face Search & Import Modal */}
       {showHfModal && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-[#0A0A0A] border border-[#1A1A1A] max-w-3xl w-full p-6 flex flex-col gap-4 shadow-2xl max-h-[85vh] overflow-hidden">
-            <div className="flex justify-between items-start border-b border-[#1A1A1A] pb-3">
-              <div>
-                <h3 className="text-label-caps font-label-caps text-[#00E5FF]">HUGGING FACE MODEL HUB</h3>
-                <p className="text-code-sm font-code-sm text-[#595959] mt-0.5">
-                  Search 100,000+ community models and import directly into this pipeline.
-                </p>
+          <div className="bg-[#0F0F0F] border border-[#2A2A2A] max-w-2xl w-full p-5 flex flex-col gap-4 shadow-2xl max-h-[85vh] overflow-hidden">
+            <div className="flex justify-between items-center border-b border-[#1E1E1E] pb-2.5">
+              <div className="flex items-center gap-2">
+                <Search size={15} className="text-[#00E5FF]" />
+                <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                  Hugging Face Model Hub
+                </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setShowHfModal(false)}
-                className="text-label-caps font-label-caps text-on-surface-variant hover:text-white px-2 py-1 border border-[#333333]"
+                className="text-[#777777] hover:text-white p-1 transition-colors"
               >
-                [ CLOSE ✕ ]
+                <X size={15} />
               </button>
             </div>
 
-            {/* Search inputs */}
-            <form onSubmit={handleHfSearch} className="flex flex-col sm:flex-row gap-3">
+            {/* Search Input Form */}
+            <form onSubmit={handleHfSearch} className="flex gap-2">
               <input
                 type="text"
                 value={hfQuery}
                 onChange={(e) => setHfQuery(e.target.value)}
-                placeholder="Search models (e.g., yolov8, phi-3, qwen, resnet)..."
-                className="flex-1 bg-[#131313] border border-[#333333] focus:border-[#00E5FF] text-body-md font-body-md text-on-background px-3 py-2 outline-none"
+                placeholder="Search models (e.g. yolov8, phi-3, qwen, resnet)..."
+                className="flex-1 bg-[#161616] border border-[#2D2D2D] focus:border-[#00E5FF] text-white px-3 py-1.5 text-xs font-mono outline-none"
               />
-              <select
-                value={hfTask}
-                onChange={(e) => setHfTask(e.target.value)}
-                className="bg-[#131313] border border-[#333333] text-body-md font-body-md text-on-background px-3 py-2 outline-none cursor-pointer"
-              >
-                <option value="">All Tasks</option>
-                <option value="object-detection">Object Detection</option>
-                <option value="image-classification">Image Classification</option>
-                <option value="text-generation">Text Generation</option>
-                <option value="feature-extraction">Feature Extraction / Embeddings</option>
-                <option value="tabular-classification">Tabular Classification</option>
-              </select>
               <button
                 type="submit"
                 disabled={hfSearching || !hfQuery.trim()}
-                className="bg-[#00E5FF] text-black px-5 py-2 text-label-caps font-label-caps font-bold hover:bg-white transition-colors disabled:opacity-50"
+                className="bg-[#00E5FF] text-black px-4 py-1.5 text-xs font-mono font-bold hover:bg-[#00cbe2] transition-colors disabled:opacity-50"
               >
-                {hfSearching ? "SEARCHING..." : "[ SEARCH ]"}
+                {hfSearching ? "Searching..." : "Search"}
               </button>
             </form>
 
             {hfError && (
-              <div className="p-2.5 border border-red-800 bg-red-950/40 text-red-400 text-code-sm font-code-sm">
+              <div className="p-2 border border-red-800 bg-red-950/40 text-red-300 text-xs font-mono">
                 {hfError}
               </div>
             )}
 
             {/* Results */}
-            <div className="flex-1 overflow-y-auto flex flex-col gap-2.5 pr-1">
+            <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-1">
               {hfResults.length === 0 && !hfSearching && (
-                <div className="text-center text-code-sm font-code-sm text-[#595959] py-12">
-                  Enter a keyword and click [ SEARCH ] to discover Hugging Face models.
+                <div className="text-center text-xs font-mono text-[#666666] py-10">
+                  Enter keywords to search models on Hugging Face Hub.
                 </div>
               )}
               {hfResults.map((m) => (
                 <div
                   key={m.id}
-                  className="bg-[#131313] border border-[#1A1A1A] hover:border-[#333333] p-3 flex justify-between items-center gap-4 transition-colors"
+                  className="bg-[#141414] border border-[#222222] hover:border-[#333333] p-2.5 flex justify-between items-center gap-3 transition-colors"
                 >
-                  <div className="flex flex-col gap-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-body-md font-body-md text-on-background font-semibold truncate">
-                        {m.id}
-                      </span>
-                      {m.pipeline_tag && (
-                        <span className="text-label-caps font-label-caps px-2 py-0.5 bg-[#1A1A1A] text-[#00E5FF] border border-[#333333]">
-                          {m.pipeline_tag}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-code-sm font-code-sm text-[#595959]">
-                      <span>By: {m.author}</span>
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="text-xs font-mono text-white font-bold truncate">
+                      {m.id}
+                    </span>
+                    <div className="flex items-center gap-3 text-[10px] font-mono text-[#666666]">
+                      <span>by {m.author}</span>
                       <span>⬇ {(m.downloads || 0).toLocaleString()}</span>
                       <span>★ {(m.likes || 0).toLocaleString()}</span>
                     </div>
@@ -1093,9 +1156,9 @@ export default function BeginnerPage() {
                     type="button"
                     onClick={() => handleHfImport(m.id)}
                     disabled={hfImporting}
-                    className="shrink-0 text-label-caps font-label-caps px-4 py-2 border border-[#00E5FF] text-[#00E5FF] hover:bg-[#00E5FF] hover:text-black transition-colors disabled:opacity-50"
+                    className="shrink-0 text-xs font-mono px-3 py-1 border border-[#00E5FF] text-[#00E5FF] hover:bg-[#00E5FF] hover:text-black transition-colors disabled:opacity-50"
                   >
-                    {hfImporting ? "IMPORTING..." : "[ IMPORT ]"}
+                    {hfImporting ? "Importing..." : "Import"}
                   </button>
                 </div>
               ))}
