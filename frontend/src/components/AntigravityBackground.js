@@ -112,12 +112,12 @@ export default function AntigravityBackground({
 
     // Animation Loop
     let animId;
-    let clock = new THREE.Clock();
+    const startTime = performance.now();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
 
-      const elapsedTime = clock.getElapsedTime();
+      const elapsedTime = (performance.now() - startTime) / 1000;
       const curVHeight = 2 * Math.tan((camera.fov * Math.PI) / 360) * camera.position.z;
       const curVWidth = curVHeight * camera.aspect;
 
