@@ -193,113 +193,12 @@ async def query_rag(experiment_id: str, payload: dict = Body(...)):
         q_emb, _ = embed_chunks([{"text": query}])
         retrieved = store.retrieve(q_emb[0], k=3)
         
-        # Format Context
-        context_text = ""
-        for i, chunk in enumerate(retrieved):
-            source = chunk.get("metadata", {}).get("source", "Unknown")
-            page = chunk.get("metadata", {}).get("page")
-            if page:
-                context_text += f"--- Context Chunk {i+1} [Source: {source}, Page: {page}] ---\n"
-            else:
-                context_text += f"--- Context Chunk {i+1} [Source: {source}] ---\n"
-            context_text += chunk["text"] + "\n\n"
-            
-        system_prompt = (
-            "You are a helpful assistant answering questions based strictly on the provided context.\n"
-            "1. You MUST NOT use outside knowledge. If the answer is not in the context, say exactly 'I don't know'.\n"
-            "2. If you answer the question, you MUST explicitly cite the source document for your information using the exact metadata provided in the context blocks. For example, '[Source: file.pdf, Page: 2]' or '[Source: file.docx]' if no page is provided.\n"
-            "3. Answer concisely and accurately.\n"
-            "4. CRITICAL: Format your answer beautifully using Markdown. Always use proper line breaks (\\n\\n), bullet points, bold text, and structured headings where appropriate to make the information highly readable. Never output a giant wall of text."
-        )
-        user_prompt = f"Context:\n{context_text}\n\nQuestion: {query}"
-        
-        # Cloud Model or Zero-Config Local Grounded Synthesis
-        import os
-        import requests
-        
-        decoded = ""
-        openrouter_key = settings.openrouter_api_key or os.environ.get("OPENROUTER_API_KEY", "")
-        groq_key = settings.groq_api_key_1 or os.environ.get("GROQ_API_KEY_1", "")
-        
-        # 1. Try Groq if available
-        if groq_key:
-            try:
-                from backend.orchestrator.groq_client import chat
-                res = chat([{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}], tools=[])
-                decoded = res.get("content", "")
-            except Exception:
-                pass
-
-        # 2. Try OpenRouter if available
-        if not decoded and openrouter_key:
-            try:
-                res = requests.post(
-                    url="https://openrouter.ai/api/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {openrouter_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "google/gemini-2.0-flash-lite-preview-02-05:free",
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ]
-                    },
-                    timeout=10
-                )
-                res_data = res.json()
-                if "choices" in res_data:
-                    decoded = res_data['choices'][0]['message'].get('content', '')
-            except Exception:
-                pass
-
-        # 3. Local GPU Model or Clean Structured Synthesis
-        if not decoded and retrieved:
-            global _active_model, _active_tokenizer
-            if _active_model is not None and _active_tokenizer is not None:
-                try:
-                    inputs = _active_tokenizer.apply_chat_template(
-                        messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
-                    ).to("cuda")
-                    gen_out = _active_model.generate(
-                        input_ids=inputs,
-                        max_new_tokens=256,
-                        use_cache=True,
-                        do_sample=False,
-                        pad_token_id=_active_tokenizer.eos_token_id
-                    )
-                    decoded = _active_tokenizer.batch_decode(gen_out[:, inputs.shape[1]:], skip_special_tokens=True)[0]
-                except Exception:
-                    pass
-
-        # 4. Clean Structured Formatting Fallback
-        if not decoded:
-            if retrieved:
-                top_chunk = retrieved[0]
-                text = top_chunk["text"].strip()
-                src = top_chunk.get("metadata", {}).get("source", "Indexed Document")
-                
-                clean_text = text.replace("<EMAIL_REDACTED>", "").replace("<PHONE_REDACTED>", "").strip()
-                paragraphs = [p.strip() for p in clean_text.split("\n") if p.strip()]
-                
-                output_lines = [f"### Grounded Response from `{src}`\n"]
-                for p in paragraphs:
-                    upper_p = p.upper()
-                    if any(header in upper_p for header in ["SUMMARY", "EDUCATION", "EXPERIENCE", "PROJECTS", "SKILLS", "AWARDS", "ACHIEVEMENTS"]):
-                        output_lines.append(f"\n**{p}**\n")
-                    elif p.startswith("•") or p.startswith("-"):
-                        output_lines.append(f"• {p.lstrip('•- ')}")
-                    else:
-                        output_lines.append(p)
-                        
-                decoded = "\n".join(output_lines)
-            else:
-                decoded = "No matching information found in the indexed document for this query."
+        from backend.rag.generator import generate_answer
+        gen_result = generate_answer(query, retrieved)
 
         return {
-            "answer": decoded,
-            "response": decoded,
+            "answer": gen_result["answer"],
+            "response": gen_result["answer"],
             "citations": retrieved
         }
         
