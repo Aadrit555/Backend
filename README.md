@@ -1,254 +1,222 @@
-<div align="center">
+# Unified AI Platform
 
-# ⚡ Unified AI Platform
-
-**An end-to-end, hardware-efficient AI workbench for fine-tuning LLMs, training computer vision classifiers, orchestrating RAG pipelines, and AutoML on tabular data.**
-
-[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Next.js](https://img.shields.io/badge/Frontend-Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.x_CUDA-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![TorchVision](https://img.shields.io/badge/TorchVision-MobileNet_%26_ResNet-red?style=for-the-badge)](https://pytorch.org/vision/)
-[![YOLOv8](https://img.shields.io/badge/Vision-Ultralytics_YOLOv8-00FFFF?style=for-the-badge)](https://ultralytics.com/)
-[![Unsloth](https://img.shields.io/badge/LLM-Unsloth_4--bit-7928CA?style=for-the-badge)](https://github.com/unslothai/unsloth)
-[![AutoGluon](https://img.shields.io/badge/AutoML-AutoGluon-FF9900?style=for-the-badge)](https://auto.gluon.ai/)
-
-<br />
-
-[Features](#-key-capabilities) • [Architecture](#-platform-architecture) • [Quick Start](#-quick-start) • [Vision Classifier](#-in-house-custom-vision-classifier) • [API Reference](#-api-endpoints)
-
-</div>
+A modular, hardware-conscious machine learning workbench for fine-tuning large language models under strict consumer VRAM constraints, training interactive vision classifiers with PyTorch, running object detection pipelines, and automating tabular model selection.
 
 ---
 
-## 📖 Overview
+## Architecture
 
-The **Unified AI Platform** democratizes machine learning by providing a unified web studio and automated backend for every major AI discipline. Whether you are training an interactive vision classifier from your webcam in 1 second, running tabular AutoML, indexing enterprise PDFs for RAG, or fine-tuning 3B parameter LLMs within a strict 6GB VRAM budget, the platform handles data preparation, hardware validation, training, and real-time deployment automatically.
-
----
-
-## 🌟 Key Capabilities
-
-| Capability | Engine / Backbone | Description | Hardware |
-|---|---|---|---|
-| **Custom Vision Classifier** | PyTorch + MobileNetV3 / ResNet18 | Interactive transfer-learning studio with webcam burst recording, sub-second training, and live <10ms streaming inference. | CUDA / CPU |
-| **Object Detection Studio** | Ultralytics YOLOv8 | End-to-end YOLOv8 pipeline with dataset splitting, training, mAP metrics, and interactive bounding box visualization. | CUDA / CPU |
-| **LLM Fine-Tuning** | Unsloth (4-bit QLoRA) | Fine-tune LLaMA-3.2 (1B/3B) and Qwen-2.5 (3B) with strict VRAM safeguards fitting on 4GB–6GB consumer GPUs. | NVIDIA CUDA |
-| **Tabular AutoML** | AutoGluon | Automated feature engineering, model selection, and ensembling (XGBoost, LightGBM, Random Forest). | CPU |
-| **Knowledge RAG** | FAISS + Sentence Transformers | Ingestion, chunking, vector indexing, and grounded query generation. | CPU |
-| **Hugging Face Hub** | `huggingface_hub` API | In-app live search by modality/task, metadata inspection, and 1-click dynamic model registry import. | Any |
-
----
-
-## 🏗️ Platform Architecture
+The platform separates user interaction, pipeline orchestration, hardware safety validation, and isolated execution backends:
 
 ```mermaid
-flowchart TD
-    subgraph UI ["Frontend Studio (Next.js 16 + Tailwind)"]
-        A[Beginner Mode / Goal Orchestration]
-        B[Expert Mode Hyperparameter Studio]
-        C[Custom Vision Classifier Studio]
-        D[YOLOv8 Detection Studio]
-        E[Hugging Face Hub Browser]
+flowchart TB
+    subgraph Client ["Client Layer (Next.js 16)"]
+        direction LR
+        UI_Vision["Vision Studio<br/>• PyTorch Classifier<br/>• YOLOv8 Detection"]
+        UI_Orch["Orchestrator Studio<br/>• Natural Language Goals<br/>• Expert Overrides"]
+        UI_HF["HF Hub Browser<br/>• Model Discovery<br/>• Registry Import"]
     end
 
-    subgraph API ["FastAPI Orchestration Core (:8000)"]
-        F[API Gateway & Routers]
-        G[Validation Gate & VRAM Probe]
-        H[Capability Registry]
+    subgraph Control ["Control & Validation Plane (FastAPI)"]
+        Router["REST Gateway"]
+        Orchestrator["Orchestrator Engine<br/>(Discovery → Formulation → Pipeline)"]
+        HardwareGate["Hardware Validation Gate<br/>(nvidia-smi VRAM Probe)"]
+        Registry["Capability Registry<br/>(Static YAML + Dynamic HF Imports)"]
     end
 
-    subgraph Adapters ["Unified Execution Engines"]
-        I["Custom Vision Engine (PyTorch)"]
-        J["Ultralytics YOLOv8 Adapter"]
-        K["Unsloth LLM Adapter"]
-        L["AutoGluon Tabular Adapter"]
-        M["FAISS RAG Engine"]
+    subgraph Engines ["Execution Adapters"]
+        Eng_Torch["Custom Vision Engine<br/>• MobileNetV3 / ResNet18<br/>• PyTorch Transfer Head"]
+        Eng_YOLO["Ultralytics Adapter<br/>• YOLOv8 Nano / Small / Medium<br/>• Auto-dataset splitting"]
+        Eng_Unsloth["Unsloth Adapter<br/>• 4-bit QLoRA Fine-Tuning<br/>• Qwen 2.5 / LLaMA 3.2"]
+        Eng_AutoGluon["AutoGluon Adapter<br/>• Tabular Ensembles<br/>• CPU Optimized"]
+        Eng_RAG["RAG Adapter<br/>• FAISS Vector Index<br/>• all-MiniLM-L6-v2"]
     end
 
-    subgraph Artifacts ["Storage & Artifacts"]
-        N[".pth Checkpoints"]
-        O["best.pt YOLO Weights"]
-        P["FAISS Vector Indices"]
-        Q["AutoGluon Predictors"]
+    subgraph Storage ["Artifact Store"]
+        Store_Weights["Checkpoints<br/>• PyTorch .pth<br/>• YOLO best.pt<br/>• LoRA Adapters"]
+        Store_Data["Local Data Store<br/>• Train/Val Splits<br/>• FAISS Indices<br/>• Metadata JSON"]
     end
 
-    UI -->|REST / Multipart / JSON| F
-    F --> G
-    G --> H
-    H --> Adapters
-    I --> N
-    J --> O
-    M --> P
-    L --> Q
-    Adapters -->|Real-Time Predictions| UI
+    Client -->|REST / JSON / Multipart| Router
+    Router --> Orchestrator
+    Orchestrator --> HardwareGate
+    HardwareGate --> Registry
+    Registry --> Engines
+
+    Eng_Torch --> Store_Weights
+    Eng_YOLO --> Store_Weights
+    Eng_Unsloth --> Store_Weights
+    Eng_AutoGluon --> Store_Weights
+    Eng_RAG --> Store_Data
+
+    Eng_Torch -.->|Sub-10ms Inference| Client
+    Eng_YOLO -.->|Annotated Predictions| Client
 ```
 
 ---
 
-## 📸 In-House Custom Vision Classifier
+## Core Systems
 
-Train custom image classifiers directly in your browser with zero cloud dependencies:
+### 1. In-House Custom Vision Classifier
+- **Backbones:** Pretrained MobileNetV3-Small (default, 9MB footprint) and ResNet18 (45MB).
+- **Transfer Head:** Frozen convolutional feature extractor with a trainable linear projection layer optimized via AdamW and Cross-Entropy Loss.
+- **Workflow:** Capture webcam snapshots via burst mode (10 FPS) across class tabs, train in under 1 second on CUDA, and stream live predictions with latency under 10ms.
+- **Persistence:** Exports standalone PyTorch `.pth` state dictionaries containing class mappings, model weights, and normalization metadata.
 
-```
-+-----------------------------------------------------------------------------------+
-|  CUSTOM VISION CLASSIFIER STUDIO                          Classes: 2  Samples: 240|
-+-------------------------------------------------+---------------------------------+
-|  [ #1 Hand (196) * ]  [ #2 Background (44) * ]  |  TRAIN MODEL                    |
-|  +-------------------------------------------+  |  [ MobileNetV3 ]  [ ResNet18 ]  |
-|  |  [ CAMERA FEED: Hand ]                    |  |  Epochs: 10   Batch: 8          |
-|  |                                           |  |  +---------------------------+  |
-|  |  [ HOLD TO RECORD SAMPLES ]  [ 1 SHOT ]   |  |  | TRAIN CUSTOM CLASSIFIER   |  |
-|  +-------------------------------------------+  |  +---------------------------+  |
-|  Filmstrip: [img][img][img][img][img]        |  |  * READY (98% Acc)   [.pth]    |
-|                                                 +---------------------------------+
-|                                                 |  LIVE TESTING (11ms latency)    |
-|                                                 |  +---------------------------+  |
-|                                                 |  | LIVE WEBCAM PREVIEW       |  |
-|                                                 |  | * Hand (98%)              |  |
-|                                                 |  +---------------------------+  |
-|                                                 |  Hand        [==========] 98%   |
-|                                                 |  Background  [=         ] 2%    |
-+-------------------------------------------------+---------------------------------+
-```
+### 2. Computer Vision Studio (YOLOv8)
+- **Engine:** Ultralytics YOLOv8 (nano, small, medium).
+- **Pipeline:** Automated dataset structuring from archives or raw image directories, train/validation split management, and mAP evaluation.
+- **Testing Interface:** Live image testing with dynamic confidence threshold controls and annotated bounding box rendering.
 
-### How it works:
-1. **Define Classes:** Click between class tabs (`Hand`, `Background`, etc.).
-2. **Collect Data:** Open the camera and hold **"HOLD TO RECORD SAMPLES"** to capture frames at 10 FPS, or upload photos.
-3. **Train in < 1 Second:** Click **"TRAIN CUSTOM CLASSIFIER"**. The PyTorch transfer learning engine freezes the backbone and trains the classification head with AdamW.
-4. **Live Inference:** Instant continuous ~10 FPS camera prediction with probability bars and downloadable `.pth` PyTorch model checkpoints.
+### 3. LLM Fine-Tuning (Unsloth)
+- **Target Hardware:** Tested against a 5.66GB usable VRAM constraint (RTX 3050 Laptop GPU).
+- **Methods:** 4-bit QLoRA instruction tuning with gradient checkpointing and memory tracking (`torch.cuda.max_memory_reserved`).
+- **Supported Models:** LLaMA-3.2 (1B, 3B) and Qwen-2.5 (3B).
 
----
+### 4. Tabular AutoML (AutoGluon)
+- **Engine:** AutoGluon TabularPredictor on CPU.
+- **Models:** Stacks and ensembles XGBoost, LightGBM, CatBoost, and Random Forest.
+- **Output:** Leaderboard evaluation and automated inference API deployment.
 
-## 🚀 Quick Start
+### 5. Grounded RAG
+- **Index:** FAISS vector index with `sentence-transformers/all-MiniLM-L6-v2` embeddings.
+- **Generation:** Context retrieval combined with structured LLM response generation.
 
-### Prerequisites
-- **Python:** 3.10, 3.11, or 3.12
-- **Node.js:** v18+ & npm
-- **GPU:** NVIDIA GPU with CUDA 11.8+ or 12.x *(Optional: CPU fallback supported for vision classifier, AutoGluon, and RAG)*
+### 6. Hugging Face Hub Integration
+- In-studio search across Hugging Face Hub filtered by modality, task, and download counts.
+- Dynamic registration of repository IDs directly into the local `capabilities.yaml` registry.
 
 ---
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/Aadrit555/Backend.git
-cd Backend
-```
+## Quick Start
+
+### Requirements
+- **Python:** 3.10 to 3.12
+- **Node.js:** v18 or newer
+- **CUDA:** 11.8 or 12.x recommended for GPU acceleration (CPU fallback available for vision classification, AutoGluon, and RAG)
 
 ---
 
-### 2. Backend Setup
+### Installation
 
-#### Create & Activate Virtual Environment
-**Windows (PowerShell):**
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
+1. **Clone repository:**
+   ```bash
+   git clone https://github.com/Aadrit555/Backend.git
+   cd Backend
+   ```
 
-**Linux / macOS:**
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
+2. **Backend environment:**
+   ```bash
+   # Windows (PowerShell)
+   python -m venv .venv
+   .venv\Scripts\Activate.ps1
 
-#### Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+   # Linux / macOS
+   python3 -m venv .venv
+   source .venv/bin/activate
 
-#### Configure Environment Variables
-Copy the example environment file:
-```bash
-cp backend/.env.example backend/.env
-```
+   pip install -r requirements.txt
+   ```
 
-Edit `backend/.env` to configure your API keys:
-```env
-# Groq API Keys for Orchestration Planning (Primary + optional failovers)
-GROQ_API_KEY_1=your_groq_api_key_here
-GROQ_MODEL=openai/gpt-oss-120b
+3. **Environment configuration:**
+   ```bash
+   cp backend/.env.example backend/.env
+   ```
+   Provide your Groq API key in `backend/.env` for pipeline planning:
+   ```env
+   GROQ_API_KEY_1=gsk_your_key_here
+   GROQ_MODEL=openai/gpt-oss-120b
+   ```
 
-# Optional: OpenRouter for external fallback
-OPENROUTER_API_KEY=
-```
+4. **Frontend setup:**
+   ```bash
+   cd frontend
+   npm install
+   ```
 
-#### Start the FastAPI Server
+---
+
+### Running the Services
+
+Start the backend service:
 ```bash
 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-> 📍 Backend is live at **`http://localhost:8000`**  
-> 📑 Swagger API Docs at **`http://localhost:8000/docs`**
 
----
-
-### 3. Frontend Setup
-
-In a new terminal window:
+In a separate terminal, start the frontend interface:
 ```bash
 cd frontend
-npm install
 npm run dev
 ```
-> 🌐 Web Studio is live at **`http://localhost:3000`**
+
+| Service | Address | Purpose |
+|---|---|---|
+| Frontend Web Studio | `http://localhost:3000` | Interactive workbench and testing studio |
+| Backend API | `http://localhost:8000` | REST API service |
+| OpenAPI Specification | `http://localhost:8000/docs` | Interactive Swagger endpoint documentation |
 
 ---
 
-## 📡 API Endpoints
+## API Reference
 
 ### Custom Vision Classifier
-| Method | Route | Description |
-|---|---|---|
-| `POST` | `/api/classifier/train` | Train a transfer model from base64 class images (`mobilenet_v3_small` / `resnet18`). |
-| `POST` | `/api/classifier/predict` | Predict class confidences from webcam frame or image file. |
-| `GET` | `/api/classifier/models` | List all trained custom vision models with metadata. |
-| `GET` | `/api/classifier/{model_id}/download` | Download `.pth` PyTorch model checkpoint. |
+
+| Endpoint | Method | Input | Output |
+|---|---|---|---|
+| `/api/classifier/train` | `POST` | `classes: dict[str, list[str]]`, `backbone: str`, `epochs: int`, `lr: float`, `batch_size: int` | Model metadata, fit time, accuracy |
+| `/api/classifier/predict` | `POST` | JSON `{ image, model_id }` or multipart form | Top class, probability distribution, latency (ms) |
+| `/api/classifier/models` | `GET` | None | List of stored models and metadata |
+| `/api/classifier/{id}/download` | `GET` | `id: str` | Binary `.pth` PyTorch model file |
 
 ### Computer Vision (YOLOv8)
-| Method | Route | Description |
-|---|---|---|
-| `POST` | `/api/vision/predict` | Run object detection inference on an image with bounding box annotations. |
-| `POST` | `/api/vision/sample` | Run sample object detection for quick visual testing. |
 
-### Hugging Face Hub Integration
-| Method | Route | Description |
-|---|---|---|
-| `GET` | `/api/hf/search` | Search models across Hugging Face Hub by task, modality, or keyword. |
-| `POST` | `/api/hf/import` | Register a model repository from Hugging Face into the platform registry. |
+| Endpoint | Method | Input | Output |
+|---|---|---|---|
+| `/api/vision/predict` | `POST` | Multipart image file, `model_id: str`, `conf_threshold: float` | Bounding boxes, class names, annotated base64 image |
+| `/api/vision/sample` | `POST` | None | Sample detection output |
 
-### System & Orchestrator
-| Method | Route | Description |
-|---|---|---|
-| `GET` | `/api/system/status` | Real-time GPU VRAM stats, active tasks, and environment health. |
-| `POST` | `/api/orchestrator/run` | Autonomous natural language pipeline execution. |
+### Hugging Face Hub
+
+| Endpoint | Method | Input | Output |
+|---|---|---|---|
+| `/api/hf/search` | `GET` | `query: str`, `task: str`, `modality: str` | Matched repository list with metrics |
+| `/api/hf/import` | `POST` | `repo_id: str`, `task: str`, `modality: str` | Registration status in capability registry |
+
+### System Status
+
+| Endpoint | Method | Input | Output |
+|---|---|---|---|
+| `/api/system/status` | `GET` | None | GPU VRAM utilization, active tasks, memory state |
 
 ---
 
-## 📂 Project Structure
+## Repository Structure
 
 ```
 ├── backend/
-│   ├── adapters/            # Modular ML adapters (Unsloth, YOLOv8, AutoGluon, RAG)
-│   ├── custom_vision_engine.py # Native PyTorch transfer learning engine
-│   ├── api.py               # REST API routers & request validation
-│   ├── main.py              # FastAPI server entry point & lifespan
-│   ├── hf_hub.py            # Hugging Face Hub search & import client
-│   ├── gpu_probe.py         # Hardware probing (nvidia-smi VRAM checks)
-│   ├── registry/            # Capabilities registry (capabilities.yaml)
-│   └── tests/               # PyTorch engine and endpoint integration test suites
+│   ├── adapters/                # Model execution adapters (Unsloth, YOLOv8, AutoGluon, RAG)
+│   ├── custom_vision_engine.py  # Native PyTorch transfer learning engine
+│   ├── api.py                   # FastAPI route definitions
+│   ├── config.py                # Environment configuration
+│   ├── gpu_probe.py             # nvidia-smi VRAM monitoring
+│   ├── hf_hub.py                # Hugging Face API client
+│   ├── main.py                  # Server entry point and lifecycle hooks
+│   ├── registry/                # Capability registry definitions (capabilities.yaml)
+│   └── tests/                   # Automated pytest suites
 │
 ├── frontend/
-│   ├── src/app/             # Next.js App Router (Studio pages & tabs)
-│   └── src/components/      # CustomVisionStudio, YOLOv8 Studio, HF Browser
+│   ├── src/app/                 # Next.js App Router (pages and layouts)
+│   └── src/components/          # CustomVisionStudio, YOLO Studio, Hub Browser
 │
-├── PROJECT_STATUS.md        # Detailed engineering status & milestones
-└── requirements.txt         # Python dependencies
+├── requirements.txt             # Backend dependencies
+└── PROJECT_STATUS.md            # Hardware diagnostics and milestone log
 ```
 
 ---
 
-## 🧪 Testing
+## Verification & Testing
 
-Run backend test suites:
+Execute backend test suites:
 ```bash
 python -m pytest backend/tests/test_custom_vision_engine.py backend/tests/test_custom_vision_api.py -v
 ```
@@ -261,6 +229,6 @@ npm run build
 
 ---
 
-## 📜 License
+## License
 
-This project is licensed under the Apache 2.0 License.
+Apache License 2.0. See `LICENSE` for details.
