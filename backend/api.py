@@ -425,7 +425,10 @@ async def chat_with_model(experiment_id: str, req: ChatRequest):
             
     # 3. Inference
     try:
-        messages = [{"role": "user", "content": req.prompt}]
+        messages = [
+            {"role": "system", "content": "You are a helpful, factual AI assistant. Answer user questions directly and accurately based on the trained documents, entities, and context."},
+            {"role": "user", "content": req.prompt}
+        ]
         inputs = _active_tokenizer.apply_chat_template(
             messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
         ).to("cuda")

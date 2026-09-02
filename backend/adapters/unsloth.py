@@ -112,8 +112,9 @@ class UnslothAdapter(BackendAdapter):
         target_file = None
         is_raw_text = False
         
-        # If it's a directory, find the first .jsonl, .json, or .txt file
+        # If it's a directory, find any document or dataset
         if dataset_path.is_dir():
+            # Check for structured JSONL/JSON first
             for ext in [".jsonl", ".json"]:
                 for p in dataset_path.glob(f"*{ext}"):
                     target_file = p
@@ -121,17 +122,21 @@ class UnslothAdapter(BackendAdapter):
                 if target_file:
                     break
             
+            # Check for raw documents (DOCX, PDF, TXT, HTML)
             if not target_file:
-                for p in dataset_path.glob("*.txt"):
-                    target_file = p
-                    is_raw_text = True
-                    break
+                for ext in [".docx", ".pdf", ".txt", ".html"]:
+                    for p in dataset_path.glob(f"*{ext}"):
+                        target_file = p
+                        is_raw_text = True
+                        break
+                    if target_file:
+                        break
                     
             if not target_file:
-                raise FileNotFoundError(f"No .jsonl, .json, or .txt file found in directory {dataset_path}")
+                raise FileNotFoundError(f"No valid dataset (.jsonl, .json, .docx, .pdf, .txt) found in {dataset_path}")
         else:
             target_file = dataset_path
-            if target_file.suffix == ".txt":
+            if target_file.suffix.lower() in [".docx", ".pdf", ".txt", ".html"]:
                 is_raw_text = True
 
         prepared_dir = Path(config.get("prepared_dir", str(dataset_path.parent / "prepared")))
