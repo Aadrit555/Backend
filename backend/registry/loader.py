@@ -28,12 +28,38 @@ _CACHE: dict[str, Any] | None = None
 def load_registry() -> dict[str, Any]:
     """Load capabilities.yaml and return the full registry dict (cached).
 
+    Merges static capabilities.yaml with dynamically imported Hugging Face models.
     Returns a dict with top-level keys "models" and "backends".
     """
     global _CACHE
     if _CACHE is None:
         with open(_REGISTRY_PATH) as f:
             _CACHE = yaml.safe_load(f) or {}
+
+        # Merge imported models if present
+        try:
+            from backend.hf_hub import list_imported_models
+            imported = list_imported_models()
+            models_dict = _CACHE.setdefault("models", {})
+            for m in imported:
+                mid = m.get("id")
+                if mid and mid not in models_dict:
+                    backend = m.get("backend", "unsloth")
+                    method = m.get("training_methods", ["lora"])[0] if m.get("training_methods") else "lora"
+                    models_dict[mid] = {
+                        "modalities": m.get("modalities", ["text"]),
+                        "tasks": m.get("tasks", ["fine_tuning"]),
+                        "training_methods": m.get("training_methods", [method]),
+                        "backends": [backend],
+                        "vram_estimates": m.get("vram_estimates", {
+                            method: {"min_mb": 512, "recommended_mb": 1024}
+                        }),
+                        "license": "community",
+                        "description": f"Imported Hugging Face Model: {mid}",
+                    }
+        except Exception as e:
+            print(f"[Loader] Note: Could not merge imported models: {e}")
+
     return _CACHE
 
 

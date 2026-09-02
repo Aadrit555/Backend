@@ -94,6 +94,13 @@ def formulate_problem(goal: str, understanding_report: dict[str, Any]) -> Proble
             pass
             # Trust the LLM extraction of target_column if it's tabular, 
             # but we could enforce the understanding report's best guess if needed.
+
+    # Heuristic 4: Images / Vision -> Object Detection
+    if file_counts.get("image", 0) > 0 or any(w in goal_lower for w in ["detect", "vision", "image", "photo", "segment", "yolo"]):
+        spec["modality"] = "image"
+        spec["needs_training"] = True
+        if spec.get("task_type") not in ["object_detection", "classification", "segmentation"]:
+            spec["task_type"] = "object_detection"
             
     # Ensure types
     return {

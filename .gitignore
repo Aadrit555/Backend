@@ -42,6 +42,7 @@ unsloth_compiled_cache/
 *.zip
 *.txt
 *.log
+*.pt
 
 # === Test Scripts ===
 /test_*.py

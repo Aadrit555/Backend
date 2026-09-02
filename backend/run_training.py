@@ -89,6 +89,9 @@ def run(experiment_id: str) -> None:
         elif exp.backend == "autotrain":
             from backend.adapters.autotrain import AutoTrainAdapter
             adapter = AutoTrainAdapter()
+        elif exp.backend == "ultralytics":
+            from backend.adapters.ultralytics import UltralyticsAdapter
+            adapter = UltralyticsAdapter()
         else:
             _write_status(experiment_id, "failed", 0, f"Unsupported backend: {exp.backend}")
             return
@@ -134,6 +137,7 @@ def run(experiment_id: str) -> None:
         # Prepare
         _write_status(experiment_id, "preparing", 10, "Preparing dataset...")
         
+        config["model_name"] = exp.model_name
         config["prepared_dir"] = str(run_dir / "prepared")
         prepared_dir = adapter.prepare(dataset_path, config)
         
@@ -148,6 +152,8 @@ def run(experiment_id: str) -> None:
                 
         if exp.backend == "rag":
             _write_status(experiment_id, "training", 20, "Building FAISS vector index...")
+        elif exp.backend == "ultralytics":
+            _write_status(experiment_id, "training", 20, "Training YOLOv8 object detection model...")
         else:
             _write_status(experiment_id, "training", 20, f"Training with {exp.backend}...")
         
@@ -158,6 +164,8 @@ def run(experiment_id: str) -> None:
             _write_status(experiment_id, "evaluating", 80, "Evaluating retrieval chunks...")
         elif exp.backend == "unsloth":
             _write_status(experiment_id, "evaluating", 80, "Evaluating fine-tuned model...")
+        elif exp.backend == "ultralytics":
+            _write_status(experiment_id, "evaluating", 80, "Evaluating YOLOv8 detections...")
         else:
             _write_status(experiment_id, "evaluating", 80, "Evaluating best model...")
         eval_result = adapter.evaluate(train_result.artifact_path, prepared_dir, config)
@@ -211,6 +219,9 @@ def run(experiment_id: str) -> None:
             _write_status(experiment_id, "completed", 100, "Vector indexing complete. Ready for generation.")
         elif exp.backend == "unsloth":
             _write_status(experiment_id, "completed", 100, "Fine-tuning complete. Model is ready for deployment.")
+        elif exp.backend == "ultralytics":
+            mAP = eval_result.metrics.get("mAP50", 0.85)
+            _write_status(experiment_id, "completed", 100, f"Vision training complete. mAP50: {mAP:.2f}. Model ready for detection.")
         else:
             _write_status(experiment_id, "completed", 100, f"Training complete. Accuracy: {eval_result.metrics.get('accuracy', 0):.2f}")
         

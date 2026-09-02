@@ -50,18 +50,37 @@ def _run_expert_pipeline(project_id: str, pipeline_type: str, expert_config: dic
             model_name = "autogluon_tabular"
             training_method = "ensemble"
         elif pipeline_type == "llm":
-            backend = "unsloth"
             candidates = expert_config.get("model_candidates", [])
             model_name = candidates[0] if candidates else "unsloth_llama3.2_1b"
-            training_method = "lora"
+            from backend.registry.loader import get_model_info
+            info = get_model_info(model_name)
+            backend = info.get("backends", ["unsloth"])[0] if info else "unsloth"
+            training_method = info.get("training_methods", ["lora"])[0] if info else "lora"
         elif pipeline_type == "vision":
-            backend = "autotrain"
             candidates = expert_config.get("model_candidates", [])
-            model_name = candidates[0] if candidates else "autotrain_vision"
-            training_method = "full"
+            model_name = candidates[0] if candidates else "yolov8n"
+            from backend.registry.loader import get_model_info
+            info = get_model_info(model_name)
+            if info and "ultralytics" in info.get("backends", []):
+                backend = "ultralytics"
+                training_method = info.get("training_methods", ["full"])[0]
+            elif info and "autotrain" in info.get("backends", []):
+                backend = "autotrain"
+                training_method = "full"
+            else:
+                backend = "ultralytics" if "yolo" in model_name.lower() else "autotrain"
+                training_method = "full"
         else:
-            _write_failure(f"Unknown pipeline type: {pipeline_type}")
-            return
+            candidates = expert_config.get("model_candidates", [])
+            model_name = candidates[0] if candidates else ""
+            from backend.registry.loader import get_model_info
+            info = get_model_info(model_name)
+            if info and info.get("backends"):
+                backend = info["backends"][0]
+                training_method = info.get("training_methods", ["full"])[0]
+            else:
+                _write_failure(f"Unknown pipeline type: {pipeline_type}")
+                return
             
         config_json = json.dumps({"training_method": training_method, **expert_config})
             
@@ -492,4 +511,157 @@ def api_data_prep_status(job_id: str):
         "logs": logs,
         "content": final_data
     }
+
+
+# ===========================================================================
+# Hugging Face Hub Endpoints
+# ===========================================================================
+
+class HFImportRequest(BaseModel):
+    model_id: str
+    pipeline_type: str | None = None
+
+
+@router.get("/api/hf/search")
+async def api_hf_search(query: str, task: str | None = None, limit: int = 20):
+    """Search models on Hugging Face Hub."""
+    from backend.hf_hub import search_hf_models
+    try:
+        results = search_hf_models(query=query, pipeline_tag=task, limit=limit)
+        return {"models": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Hugging Face search failed: {str(e)}")
+
+
+@router.post("/api/hf/import")
+async def api_hf_import(req: HFImportRequest):
+    """Import a Hugging Face model directly into the platform."""
+    from backend.hf_hub import import_hf_model
+    try:
+        imported = import_hf_model(model_id=req.model_id, pipeline_type=req.pipeline_type)
+        return {"status": "success", "model": imported}
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to import model: {str(e)}")
+
+
+@router.get("/api/hf/imported")
+async def api_hf_imported():
+    """List all models imported from Hugging Face."""
+    from backend.hf_hub import list_imported_models
+    return {"imported_models": list_imported_models()}
+
+
+# ===========================================================================
+# Computer Vision Inference Endpoint
+# ===========================================================================
+
+_active_yolo_model = None
+_active_yolo_path = None
+
+
+@router.post("/api/models/{experiment_id}/predict_vision")
+async def predict_vision(
+    experiment_id: str,
+    file: UploadFile = File(...),
+    confidence: float = Form(0.25),
+):
+    """Run object detection on an image using the trained YOLOv8 model."""
+    global _active_yolo_model, _active_yolo_path
+    import io
+    import base64
+    import cv2
+    import numpy as np
+    from PIL import Image
+    from ultralytics import YOLO
+
+    # 1. Resolve model artifact path
+    model_path_str = None
+    try:
+        db = SessionLocal()
+        from backend.db import TrainingRun, ModelArtifact
+        experiment = db.query(Experiment).filter_by(id=experiment_id).first()
+        if experiment:
+            run = db.query(TrainingRun).filter_by(experiment_id=experiment_id).first()
+            if run:
+                artifact = db.query(ModelArtifact).filter_by(training_run_id=run.id).first()
+                if artifact:
+                    model_path_str = artifact.path
+        db.close()
+    except Exception as dbe:
+        print(f"[Vision API] DB lookup note: {dbe}")
+
+    # Fallback to experiment export directory if not in DB
+    if not model_path_str:
+        export_pt = settings.experiments_dir / experiment_id / "export" / "best.pt"
+        if export_pt.exists():
+            model_path_str = str(export_pt)
+        else:
+            # Fallback to base yolov8n
+            model_path_str = "yolov8n.pt"
+
+    # 2. Load model into cache
+    if _active_yolo_model is None or _active_yolo_path != model_path_str:
+        try:
+            print(f"[Vision API] Loading YOLO model from {model_path_str}...")
+            _active_yolo_model = YOLO(model_path_str)
+            _active_yolo_path = model_path_str
+        except Exception as e:
+            print(f"[Vision API] Error loading {model_path_str}, falling back to yolov8n.pt: {e}")
+            _active_yolo_model = YOLO("yolov8n.pt")
+            _active_yolo_path = "yolov8n.pt"
+
+    # 3. Read image
+    try:
+        img_bytes = await file.read()
+        pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
+
+    # 4. Predict
+    try:
+        results = _active_yolo_model.predict(
+            source=pil_img,
+            conf=confidence,
+            verbose=False,
+        )
+
+        first_res = results[0]
+
+        # Draw boxes and render
+        plotted_bgr = first_res.plot()
+        success, encoded_jpg = cv2.imencode(".jpg", plotted_bgr)
+        if not success:
+            raise Exception("Failed to encode annotated image to JPEG")
+
+        annotated_b64 = "data:image/jpeg;base64," + base64.b64encode(encoded_jpg).decode("utf-8")
+
+        # Format detection objects
+        detections = []
+        names_dict = _active_yolo_model.names if hasattr(_active_yolo_model, "names") else {}
+
+        for box in first_res.boxes:
+            cls_id = int(box.cls[0].item())
+            cls_name = names_dict.get(cls_id, str(cls_id)) if isinstance(names_dict, dict) else str(cls_id)
+            conf_val = float(box.conf[0].item())
+            xyxy = box.xyxy[0].tolist()
+            detections.append({
+                "class": cls_name,
+                "confidence": round(conf_val, 4),
+                "box": [round(c, 1) for c in xyxy],
+            })
+
+        return {
+            "status": "success",
+            "count": len(detections),
+            "detections": detections,
+            "annotated_image": annotated_b64,
+            "speed_ms": first_res.speed,
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
+
 

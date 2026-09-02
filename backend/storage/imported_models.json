@@ -1,0 +1,28 @@
+[
+  {
+    "id": "keremberke/yolov8n-table-extraction",
+    "name": "yolov8n-table-extraction",
+    "author": "keremberke",
+    "pipeline_type": "vision",
+    "pipeline_tag": "object-detection",
+    "backend": "ultralytics",
+    "modalities": [
+      "image"
+    ],
+    "tasks": [
+      "object-detection"
+    ],
+    "training_methods": [
+      "full"
+    ],
+    "vram_estimates": {
+      "full": {
+        "min_mb": 1024,
+        "recommended_mb": 2048
+      }
+    },
+    "downloads": 726,
+    "likes": 14,
+    "imported_at": "2026-09-02T18:43:07.487723+00:00"
+  }
+]

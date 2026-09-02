@@ -148,13 +148,27 @@ models:
       Hugging Face AutoTrain Advanced. Automatically fine-tunes Vision Transformers
       (ViT) for Image Classification and Object Detection.
 
+  yolov8:
+    modalities: [image, video]
+    tasks: [object_detection, classification, segmentation]
+    training_methods: [full, transfer]
+    backends: [ultralytics]
+    vram_estimates:
+      full: { min_mb: 512, recommended_mb: 1024 }
+      transfer: { min_mb: 512, recommended_mb: 1024 }
+    license: agpl-3.0
+    description: >
+      YOLOv8 Default (Nano) — fastest, smallest YOLO variant. Good for real-time
+      detection on edge devices.
+
   yolov8n:
     modalities: [image, video]
     tasks: [object_detection, classification, segmentation]
-    training_methods: [full]
+    training_methods: [full, transfer]
     backends: [ultralytics]
     vram_estimates:
-      full: { min_mb: 4000, recommended_mb: 8000 }
+      full: { min_mb: 512, recommended_mb: 1024 }
+      transfer: { min_mb: 512, recommended_mb: 1024 }
     license: agpl-3.0
     description: >
       YOLOv8 Nano — fastest, smallest YOLO variant. Good for real-time
@@ -163,13 +177,26 @@ models:
   yolov8s:
     modalities: [image, video]
     tasks: [object_detection, classification, segmentation]
-    training_methods: [full]
+    training_methods: [full, transfer]
     backends: [ultralytics]
     vram_estimates:
-      full: { min_mb: 6000, recommended_mb: 10000 }
+      full: { min_mb: 1024, recommended_mb: 2048 }
+      transfer: { min_mb: 1024, recommended_mb: 2048 }
     license: agpl-3.0
     description: >
       YOLOv8 Small — balanced speed/accuracy tradeoff.
+
+  yolov8m:
+    modalities: [image, video]
+    tasks: [object_detection, classification, segmentation]
+    training_methods: [full, transfer]
+    backends: [ultralytics]
+    vram_estimates:
+      full: { min_mb: 2048, recommended_mb: 4096 }
+      transfer: { min_mb: 2048, recommended_mb: 4096 }
+    license: agpl-3.0
+    description: >
+      YOLOv8 Medium — higher accuracy object detection.
 
 
   # =========================================================================
