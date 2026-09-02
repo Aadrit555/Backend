@@ -1,5 +1,0 @@
-{"conversations": [{"from": "human", "value": "Who are you?"}, {"from": "gpt", "value": "I am an AI assistant built to help you with your daily tasks."}]}
-{"conversations": [{"from": "human", "value": "What is the capital of France?"}, {"from": "gpt", "value": "The capital of France is Paris."}]}
-{"conversations": [{"from": "human", "value": "Write a python function to add two numbers."}, {"from": "gpt", "value": "```python\ndef add(a, b):\n    return a + b\n```"}]}
-{"conversations": [{"from": "human", "value": "Translate 'Hello' to Spanish."}, {"from": "gpt", "value": "Hola"}]}
-{"conversations": [{"from": "human", "value": "What is the speed of light?"}, {"from": "gpt", "value": "The speed of light in a vacuum is approximately 299,792 kilometers per second (km/s)."}]}
