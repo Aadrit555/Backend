@@ -36,6 +36,7 @@ frontend/out/
 
 # === Outputs and Temporary Data ===
 outputs/
+runs/
 unsloth_compiled_cache/
 *.jsonl
 *.csv

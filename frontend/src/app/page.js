@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { UploadCloud, CheckCircle2, DownloadCloud, Play, Sparkles, Search, X, Image as ImageIcon, Sliders } from "lucide-react";
-import Link from "next/link";
+import CustomVisionStudio from "../components/CustomVisionStudio";
 
 export default function BeginnerPage() {
   const [projectId, setProjectId] = useState("proj_init");
@@ -13,6 +13,7 @@ export default function BeginnerPage() {
 
   const [modelCandidate, setModelCandidate] = useState("autogluon_best");
   const [activeTab, setActiveTab] = useState("tabular");
+  const [visionSubMode, setVisionSubMode] = useState("classifier"); // "classifier" | "detection"
   const [files, setFiles] = useState([]);
   const [manifest, setManifest] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -816,156 +817,188 @@ export default function BeginnerPage() {
           </section>
         )}
 
-        {/* Computer Vision Inference Studio */}
+        {/* Computer Vision Section */}
         {(experimentBackend === "ultralytics" || activeTab === "vision") && (
-          <section className="flex flex-col gap-4 mt-8 mb-24">
-            <div className="flex justify-between items-end border-b border-[#1A1A1A] pb-2 flex-wrap gap-2">
-              <div>
-                <h2 className="text-label-caps font-label-caps text-on-surface-variant">
-                  COMPUTER VISION INFERENCE STUDIO (YOLOV8)
-                </h2>
-                <p className="text-code-sm font-code-sm text-[#595959] mt-1">
-                  Upload test images or run sample detection with confidence threshold control.
-                </p>
-              </div>
+          <section className="flex flex-col gap-6 mt-8 mb-24">
+            {/* Vision Sub-Mode Switcher */}
+            <div className="flex border-b border-[#1A1A1A] gap-6 flex-wrap">
               <button
                 type="button"
-                onClick={handleVisionSample}
-                disabled={isDetecting}
-                className="text-label-caps font-label-caps px-3 py-1.5 border border-[#333333] hover:border-[#00E5FF] text-on-surface-variant hover:text-[#00E5FF] transition-colors flex items-center gap-1.5 bg-[#131313]"
+                onClick={() => setVisionSubMode("classifier")}
+                className={`pb-3 text-label-caps font-label-caps border-b-2 transition-colors flex items-center gap-2 ${visionSubMode === "classifier" || visionSubMode === "teachable"
+                    ? "border-[#00E5FF] text-[#00E5FF]"
+                    : "border-transparent text-on-surface-variant hover:text-on-background"
+                  }`}
               >
-                <Sparkles size={13} className="text-[#00E5FF]" />
-                [ TRY SAMPLE TEST IMAGE ]
+                <Sparkles size={14} className={visionSubMode === "classifier" || visionSubMode === "teachable" ? "text-[#00E5FF]" : "text-[#595959]"} />
+                CUSTOM VISION CLASSIFIER (IN-HOUSE)
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisionSubMode("detection")}
+                className={`pb-3 text-label-caps font-label-caps border-b-2 transition-colors flex items-center gap-2 ${visionSubMode === "detection"
+                    ? "border-[#00E5FF] text-[#00E5FF]"
+                    : "border-transparent text-on-surface-variant hover:text-on-background"
+                  }`}
+              >
+                <ImageIcon size={14} className={visionSubMode === "detection" ? "text-[#00E5FF]" : "text-[#595959]"} />
+                OBJECT DETECTION (YOLOV8 STUDIO)
               </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-[#0A0A0A] border border-[#1A1A1A] p-6">
-              {/* Controls Column */}
+            {visionSubMode === "classifier" || visionSubMode === "teachable" ? (
+              <CustomVisionStudio />
+            ) : (
               <div className="flex flex-col gap-4">
-                <div
-                  className="border border-dashed border-[#333333] hover:border-[#00E5FF] transition-colors bg-[#131313] p-6 flex flex-col items-center justify-center gap-3 cursor-pointer group min-h-[220px]"
-                  onClick={() => visionInputRef.current?.click()}
-                >
-                  {visionPreview ? (
-                    <div className="text-center">
-                      <img
-                        src={visionPreview}
-                        alt="Test image"
-                        className="max-h-48 max-w-full rounded border border-[#1A1A1A] object-contain mb-2 mx-auto"
+                <div className="flex justify-between items-end border-b border-[#1A1A1A] pb-2 flex-wrap gap-2">
+                  <div>
+                    <h2 className="text-label-caps font-label-caps text-on-surface-variant">
+                      COMPUTER VISION INFERENCE STUDIO (YOLOV8)
+                    </h2>
+                    <p className="text-code-sm font-code-sm text-[#595959] mt-1">
+                      Upload test images or run sample detection with confidence threshold control.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleVisionSample}
+                    disabled={isDetecting}
+                    className="text-label-caps font-label-caps px-3 py-1.5 border border-[#333333] hover:border-[#00E5FF] text-on-surface-variant hover:text-[#00E5FF] transition-colors flex items-center gap-1.5 bg-[#131313]"
+                  >
+                    <Sparkles size={13} className="text-[#00E5FF]" />
+                    [ TRY SAMPLE TEST IMAGE ]
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-[#0A0A0A] border border-[#1A1A1A] p-6">
+                  {/* Controls Column */}
+                  <div className="flex flex-col gap-4">
+                    <div
+                      className="border border-dashed border-[#333333] hover:border-[#00E5FF] transition-colors bg-[#131313] p-6 flex flex-col items-center justify-center gap-3 cursor-pointer group min-h-[220px]"
+                      onClick={() => visionInputRef.current?.click()}
+                    >
+                      {visionPreview ? (
+                        <div className="text-center">
+                          <img
+                            src={visionPreview}
+                            alt="Test image"
+                            className="max-h-48 max-w-full rounded border border-[#1A1A1A] object-contain mb-2 mx-auto"
+                          />
+                          <span className="text-code-sm font-code-sm text-[#595959] group-hover:text-[#00E5FF] transition-colors">
+                            Click to change image
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <UploadCloud size={32} className="text-[#595959] group-hover:text-[#00E5FF] transition-colors" />
+                          <div className="text-center flex flex-col gap-1">
+                            <span className="text-body-md font-body-md text-on-background">
+                              Drop test image here or browse
+                            </span>
+                            <span className="text-code-sm font-code-sm text-[#595959]">Supports JPG, PNG, WEBP</span>
+                          </div>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        ref={visionInputRef}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleVisionFileSelect(e.target.files[0]);
+                          }
+                        }}
                       />
-                      <span className="text-code-sm font-code-sm text-[#595959] group-hover:text-[#00E5FF] transition-colors">
-                        Click to change image
-                      </span>
                     </div>
-                  ) : (
-                    <>
-                      <UploadCloud size={32} className="text-[#595959] group-hover:text-[#00E5FF] transition-colors" />
-                      <div className="text-center flex flex-col gap-1">
-                        <span className="text-body-md font-body-md text-on-background">
-                          Drop test image here or browse
+
+                    {/* Confidence Threshold & Action */}
+                    <div className="flex flex-col gap-2 p-4 bg-[#131313] border border-[#1A1A1A]">
+                      <div className="flex justify-between text-label-caps font-label-caps">
+                        <span className="text-on-surface-variant flex items-center gap-1.5">
+                          <Sliders size={13} className="text-[#00E5FF]" /> CONFIDENCE THRESHOLD
                         </span>
-                        <span className="text-code-sm font-code-sm text-[#595959]">Supports JPG, PNG, WEBP</span>
+                        <span className="text-[#00E5FF] font-code-sm font-code-sm">{(visionConf * 100).toFixed(0)}%</span>
                       </div>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    ref={visionInputRef}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleVisionFileSelect(e.target.files[0]);
-                      }
-                    }}
-                  />
-                </div>
+                      <input
+                        type="range"
+                        min="0.05"
+                        max="0.95"
+                        step="0.05"
+                        value={visionConf}
+                        onChange={(e) => setVisionConf(parseFloat(e.target.value))}
+                        className="accent-[#00E5FF] cursor-pointer"
+                      />
+                    </div>
 
-                {/* Confidence Threshold & Action */}
-                <div className="flex flex-col gap-2 p-4 bg-[#131313] border border-[#1A1A1A]">
-                  <div className="flex justify-between text-label-caps font-label-caps">
-                    <span className="text-on-surface-variant flex items-center gap-1.5">
-                      <Sliders size={13} className="text-[#00E5FF]" /> CONFIDENCE THRESHOLD
-                    </span>
-                    <span className="text-[#00E5FF] font-code-sm font-code-sm">{(visionConf * 100).toFixed(0)}%</span>
+                    <button
+                      type="button"
+                      onClick={handleRunVisionInference}
+                      disabled={isDetecting || !visionFile}
+                      className="bg-[#00E5FF] text-black py-3 text-label-caps font-label-caps font-bold hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isDetecting ? "DETECTING OBJECTS..." : "[ RUN OBJECT DETECTION ]"}
+                    </button>
+
+                    {visionError && (
+                      <div className="p-3 border border-red-800 bg-red-950/40 text-red-400 text-code-sm font-code-sm">
+                        {visionError}
+                      </div>
+                    )}
                   </div>
-                  <input
-                    type="range"
-                    min="0.05"
-                    max="0.95"
-                    step="0.05"
-                    value={visionConf}
-                    onChange={(e) => setVisionConf(parseFloat(e.target.value))}
-                    className="accent-[#00E5FF] cursor-pointer"
-                  />
-                </div>
 
-                <button
-                  type="button"
-                  onClick={handleRunVisionInference}
-                  disabled={isDetecting || !visionFile}
-                  className="bg-[#00E5FF] text-black py-3 text-label-caps font-label-caps font-bold hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isDetecting ? "DETECTING OBJECTS..." : "[ RUN OBJECT DETECTION ]"}
-                </button>
-
-                {visionError && (
-                  <div className="p-3 border border-red-800 bg-red-950/40 text-red-400 text-code-sm font-code-sm">
-                    {visionError}
-                  </div>
-                )}
-              </div>
-
-              {/* Output Column */}
-              <div className="flex flex-col bg-[#0e0e0e] border border-[#1A1A1A] p-4 min-h-[300px]">
-                <div className="flex justify-between items-center border-b border-[#1A1A1A] pb-3 mb-3">
-                  <span className="text-label-caps font-label-caps text-on-surface-variant">DETECTION VISUALIZATION</span>
-                  {visionResult && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-label-caps font-label-caps px-2 py-0.5 bg-[#00363d] text-[#00E5FF] border border-[#00626e]">
-                        {visionResult.count} {visionResult.count === 1 ? "OBJECT" : "OBJECTS"}
-                      </span>
-                      {visionResult.speed_ms?.inference && (
-                        <span className="text-code-sm font-code-sm text-[#595959]">
-                          {visionResult.speed_ms.inference.toFixed(1)}ms
-                        </span>
+                  {/* Output Column */}
+                  <div className="flex flex-col bg-[#0e0e0e] border border-[#1A1A1A] p-4 min-h-[300px]">
+                    <div className="flex justify-between items-center border-b border-[#1A1A1A] pb-3 mb-3">
+                      <span className="text-label-caps font-label-caps text-on-surface-variant">DETECTION VISUALIZATION</span>
+                      {visionResult && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-label-caps font-label-caps px-2 py-0.5 bg-[#00363d] text-[#00E5FF] border border-[#00626e]">
+                            {visionResult.count} {visionResult.count === 1 ? "OBJECT" : "OBJECTS"}
+                          </span>
+                          {visionResult.speed_ms?.inference && (
+                            <span className="text-code-sm font-code-sm text-[#595959]">
+                              {visionResult.speed_ms.inference.toFixed(1)}ms
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
 
-                <div className="flex-1 flex items-center justify-center">
-                  {visionResult?.annotated_image ? (
-                    <img
-                      src={visionResult.annotated_image}
-                      alt="Detection Results"
-                      className="max-h-72 max-w-full object-contain rounded border border-[#1A1A1A]"
-                    />
-                  ) : (
-                    <div className="text-center text-code-sm font-code-sm text-[#595959] p-8">
-                      {isDetecting ? "Running YOLOv8 inference..." : "Upload an image and run detection to view bounding boxes"}
+                    <div className="flex-1 flex items-center justify-center">
+                      {visionResult?.annotated_image ? (
+                        <img
+                          src={visionResult.annotated_image}
+                          alt="Detection Results"
+                          className="max-h-72 max-w-full object-contain rounded border border-[#1A1A1A]"
+                        />
+                      ) : (
+                        <div className="text-center text-code-sm font-code-sm text-[#595959] p-8">
+                          {isDetecting ? "Running YOLOv8 inference..." : "Upload an image and run detection to view bounding boxes"}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {visionResult?.detections && visionResult.detections.length > 0 && (
-                  <div className="border-t border-[#1A1A1A] pt-3 mt-3 flex flex-col gap-2">
-                    <span className="text-label-caps font-label-caps text-[#595959]">DETECTED LABELS:</span>
-                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                      {visionResult.detections.map((d, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2.5 py-1 bg-[#131313] border border-[#333333] text-code-sm font-code-sm text-on-background flex items-center gap-2"
-                        >
-                          <span className="text-[#00E5FF] font-semibold">{d.class}</span>
-                          <span className="text-[#595959]">{(d.confidence * 100).toFixed(1)}%</span>
-                        </span>
-                      ))}
-                    </div>
+                    {visionResult?.detections && visionResult.detections.length > 0 && (
+                      <div className="border-t border-[#1A1A1A] pt-3 mt-3 flex flex-col gap-2">
+                        <span className="text-label-caps font-label-caps text-[#595959]">DETECTED LABELS:</span>
+                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                          {visionResult.detections.map((d, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2.5 py-1 bg-[#131313] border border-[#333333] text-code-sm font-code-sm text-on-background flex items-center gap-2"
+                            >
+                              <span className="text-[#00E5FF] font-semibold">{d.class}</span>
+                              <span className="text-[#595959]">{(d.confidence * 100).toFixed(1)}%</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
-            </div>
+            )}
           </section>
         )}
 

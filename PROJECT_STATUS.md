@@ -7,11 +7,12 @@
 - **World 4 (RAG):** Built a complete Retrieval-Augmented Generation pipeline using FAISS vector indexing and local embeddings for document-grounded query answering.
 - **World 3 (Vision):** Fully integrated `Ultralytics` YOLOv8 adapter with automated dataset preparation (zip extraction, loose image train/val splitting, auto-pseudo-labeling), training on CUDA/CPU, mAP evaluation, model artifact export, and real-time inference prediction API with bounding box rendering.
 - **Hugging Face Model Hub & Direct Web Import:** Integrated real-time Hugging Face search directly into the web UI with filters by task/modality, download and like counts, direct repository ID import, dynamic registration into the capability registry, and persistent storage.
+- **In-House Custom Vision Classifier System (PyTorch & TorchVision):** Built a native, proprietary transfer-learning vision classification engine and studio replacing third-party Teachable Machine wrappers. Supports MobileNetV3-Small (ultra-fast, 9MB) and ResNet18 (deep residual, 45MB) with custom classification heads, sub-second training, live webcam burst sampling, PyTorch `.pth` checkpoint export, and sub-10ms real-time inference.
 - **Computer Vision Inference Studio:** Built an interactive web testing studio for vision models featuring image upload/drop, confidence threshold adjustments, one-click sample test generation, and live visual rendering of annotated bounding boxes alongside detailed class and confidence breakdowns.
 - **Frontend UI (Phase 5):** Developed a Next.js application with two distinct views:
   - **Beginner Mode:** A simplified interface where users drag-and-drop data, state their goal, and the orchestrator automatically picks the best model (now with an optional dropdown).
   - **Expert Mode:** A power-user interface exposing raw hyperparameters, exact model selection, evaluation metrics, and time limits.
-- **Real-Time API & Deployment:** Implemented a unified FastAPI backend that seamlessly deploys trained models (AutoGluon predictors, Unsloth LLMs, and Ultralytics vision detectors) and exposes them through chat and vision prediction interfaces in the frontend.
+- **Real-Time API & Deployment:** Implemented a unified FastAPI backend that seamlessly deploys trained models (AutoGluon predictors, Unsloth LLMs, Ultralytics vision detectors, and native PyTorch vision classifiers) and exposes them through chat and vision prediction interfaces in the frontend.
 
 ## What We Are Using
 - **Core Backend:** Python, FastAPI, SQLAlchemy, Uvicorn.
@@ -20,7 +21,8 @@
   - `Unsloth` (for memory-efficient LLM fine-tuning).
   - `AutoGluon` (for Tabular AutoML).
   - `FAISS` & `sentence-transformers` (for RAG).
-  - `Ultralytics` / YOLOv8 (for Vision).
+  - `Ultralytics` / YOLOv8 (for Vision Detection).
+  - `PyTorch` & `torchvision` (for In-House Custom Vision Transfer Learning & Classification).
 - **Hugging Face Integration:** `huggingface_hub` for live hub discovery and dynamic import.
 - **Frontend:** Next.js (React), standard CSS, `lucide-react` for icons.
 - **Hardware Constraint:** Actively developing against a strict 5.66GB usable VRAM limit (NVIDIA RTX 3050 Laptop GPU).

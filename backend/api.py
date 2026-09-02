@@ -6,7 +6,7 @@ from typing import Any, List
 import json
 import traceback
 
-from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, HTTPException, Body
+from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, HTTPException, Body, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -663,5 +663,116 @@ async def predict_vision(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
+
+
+# ===========================================================================
+# In-House Custom Vision Classifier Endpoints
+# ===========================================================================
+
+class ClassifierTrainRequest(BaseModel):
+    classes: dict[str, list[str]]  # name -> list of base64 data URLs
+    backbone: str = "mobilenet_v3_small"  # "mobilenet_v3_small" or "resnet18"
+    epochs: int = 10
+    lr: float = 0.001
+    batch_size: int = 8
+
+
+class ClassifierPredictRequest(BaseModel):
+    image: str  # base64 data URL
+    model_id: str | None = None
+
+
+# Legacy request models for backward compatibility
+class TeachableTrainRequest(BaseModel):
+    classes: dict[str, list[str]]
+    epochs: int = 10
+    imgsz: int = 224
+    batch_size: int = 8
+
+
+class TeachablePredictRequest(BaseModel):
+    image: str
+    model_id: str | None = None
+
+
+@router.post("/api/classifier/train")
+@router.post("/api/teachable/train")
+async def api_classifier_train(req: ClassifierTrainRequest):
+    """Train an in-house transfer-learning vision classifier using PyTorch & TorchVision."""
+    from backend.custom_vision_engine import train_classifier
+    try:
+        result = train_classifier(
+            classes_data=req.classes,
+            backbone=getattr(req, "backbone", "mobilenet_v3_small"),
+            epochs=req.epochs,
+            lr=getattr(req, "lr", 0.001),
+            batch_size=req.batch_size,
+        )
+        return {"status": "success", "model": result}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Custom Vision training failed: {str(e)}")
+
+
+@router.post("/api/classifier/predict")
+@router.post("/api/teachable/predict")
+async def api_classifier_predict(request: Request):
+    """Predict class probabilities on an image from webcam frame or file upload using native PyTorch."""
+    from backend.custom_vision_engine import predict_classification
+    content_type = request.headers.get("content-type", "")
+    try:
+        if "multipart/form-data" in content_type:
+            form = await request.form()
+            file = form.get("file")
+            model_id = form.get("model_id")
+            if file and hasattr(file, "read"):
+                img_bytes = await file.read()
+                return predict_classification(img_bytes, model_id=model_id)
+            elif "image" in form:
+                return predict_classification(str(form["image"]), model_id=model_id)
+        else:
+            body = await request.json()
+            image = body.get("image")
+            model_id = body.get("model_id")
+            if image:
+                return predict_classification(image, model_id=model_id)
+
+        raise HTTPException(status_code=400, detail="No image provided (either JSON image or multipart file is required)")
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+
+
+@router.get("/api/classifier/models")
+@router.get("/api/teachable/models")
+async def api_classifier_models():
+    """List all previously trained custom vision models."""
+    from backend.custom_vision_engine import list_models
+    return {"models": list_models()}
+
+
+@router.get("/api/classifier/{model_id}/download")
+@router.get("/api/teachable/{model_id}/download")
+async def api_classifier_download(model_id: str):
+    """Download the trained model checkpoint (.pth)."""
+    from backend.custom_vision_engine import get_models_dir
+    weights_path = get_models_dir() / model_id / "model.pth"
+    if not weights_path.exists():
+        # Check if legacy best.pt exists
+        legacy_path = get_models_dir().parent / "teachable" / model_id / "best.pt"
+        if legacy_path.exists():
+            weights_path = legacy_path
+        else:
+            raise HTTPException(status_code=404, detail=f"Model '{model_id}' weights not found")
+    return FileResponse(
+        path=str(weights_path),
+        filename=f"classifier_{model_id}.pth",
+        media_type="application/octet-stream",
+    )
+
 
 
