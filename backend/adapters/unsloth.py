@@ -16,6 +16,16 @@ from backend.adapters.base import (
     TrainingResult,
 )
 
+# Python 3.14 compatibility monkeypatch for HuggingFace datasets dill pickler
+try:
+    import dill
+    import datasets.utils._dill
+    datasets.utils._dill.Pickler._batch_setitems = (
+        lambda self, items, *args, **kwargs: dill.Pickler._batch_setitems(self, items, *args, **kwargs)
+    )
+except Exception:
+    pass
+
 
 class UnslothAdapter(BackendAdapter):
     """BIBLE §19 — LLM Fine-tuning via Unsloth."""
@@ -344,29 +354,33 @@ class UnslothAdapter(BackendAdapter):
         dataset = dataset.map(formatting_func, batched=True)
 
         print("Initializing SFTTrainer...")
+        from trl import SFTTrainer, SFTConfig
+
+        training_args = SFTConfig(
+            per_device_train_batch_size=batch_size,
+            gradient_accumulation_steps=4,
+            warmup_steps=2,
+            max_steps=10, # Exact limit to prove gradients work
+            learning_rate=2e-4,
+            fp16=not is_bfloat16_supported(),
+            bf16=is_bfloat16_supported(),
+            logging_steps=1,
+            optim="adamw_8bit",
+            weight_decay=0.01,
+            lr_scheduler_type="linear",
+            seed=3407,
+            output_dir=str(model_out_dir),
+            max_length=max_seq_length,
+            dataset_text_field="text",
+            packing=False,
+            dataset_num_proc=1,
+        )
+
         trainer = SFTTrainer(
             model=model,
-            tokenizer=tokenizer,
             train_dataset=dataset,
-            dataset_text_field="text",
-            max_seq_length=max_seq_length,
-            dataset_num_proc=1,
-            packing=False,
-            args=TrainingArguments(
-                per_device_train_batch_size=batch_size,
-                gradient_accumulation_steps=4,
-                warmup_steps=2,
-                max_steps=10, # Exact limit to prove gradients work
-                learning_rate=2e-4,
-                fp16=not is_bfloat16_supported(),
-                bf16=is_bfloat16_supported(),
-                logging_steps=1,
-                optim="adamw_8bit",
-                weight_decay=0.01,
-                lr_scheduler_type="linear",
-                seed=3407,
-                output_dir=str(model_out_dir),
-            ),
+            processing_class=tokenizer,
+            args=training_args,
         )
         
         print("Starting Unsloth Training Loop...")

@@ -761,9 +761,21 @@ export default function BeginnerPage() {
             <div className="bg-[#0e0e0e] border border-[#1A1A1A] p-6 flex flex-col min-h-[400px]">
               <div className="flex-1 overflow-y-auto mb-4 flex flex-col gap-6">
                 {ragChat.length === 0 && (
-                  <div className="text-code-sm font-code-sm text-[#595959] italic text-center mt-10">
-                    Endpoint active. Awaiting input...
-                  </div>
+                  isBuilding ? (
+                    <div className="text-code-sm font-code-sm text-[#00E5FF] italic text-center mt-12 flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-2 font-mono">
+                        <span className="inline-block w-2 h-2 rounded-full bg-[#00E5FF] animate-ping" />
+                        <span>MODEL TRAINING IN PROGRESS...</span>
+                      </div>
+                      <span className="text-[#595959] text-xs">
+                        The inference endpoint will activate automatically once training completes.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-code-sm font-code-sm text-[#595959] italic text-center mt-10">
+                      Endpoint active. Awaiting input...
+                    </div>
+                  )
                 )}
 
                 {ragChat.map((msg, i) => (
@@ -801,13 +813,13 @@ export default function BeginnerPage() {
                   type="text"
                   value={ragQuery}
                   onChange={e => setRagQuery(e.target.value)}
-                  placeholder="Enter query..."
-                  disabled={isQuerying}
-                  className="flex-1 bg-transparent border-none border-b border-[#333333] text-body-md font-body-md text-on-background p-2 focus:border-[#00E5FF] focus:outline-none transition-colors"
+                  placeholder={isBuilding ? "Model training in progress..." : "Enter query..."}
+                  disabled={isQuerying || isBuilding}
+                  className="flex-1 bg-transparent border-none border-b border-[#333333] text-body-md font-body-md text-on-background p-2 focus:border-[#00E5FF] focus:outline-none transition-colors disabled:opacity-50"
                 />
                 <button
                   type="submit"
-                  disabled={isQuerying || !ragQuery.trim()}
+                  disabled={isQuerying || isBuilding || !ragQuery.trim()}
                   className="bg-transparent border border-[#333333] text-on-surface-variant px-6 py-2 text-label-caps font-label-caps hover:border-[#00E5FF] hover:text-[#00E5FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   [ SEND ]
