@@ -59,9 +59,10 @@ class UnslothAdapter(BackendAdapter):
         seq_length = config.get("max_seq_length", 1024)
         
         # 2. Base weight memory
-        # Unsloth heavily relies on 4-bit (QLoRA) for max efficiency
-        if training_method == "qlora":
-            bytes_per_param = 0.55  # slightly higher for 4-bit overhead
+        # If the model is 4-bit quantized (e.g., bnb-4bit) or method is qlora, use 4-bit footprint (0.55 bytes/param)
+        is_4bit = "4bit" in model_name.lower() or training_method.lower() in ["qlora", "4bit"]
+        if is_4bit:
+            bytes_per_param = 0.55  # 4-bit quantization with BitsAndBytes overhead
         else:
             bytes_per_param = 2.0  # bf16/fp16
             

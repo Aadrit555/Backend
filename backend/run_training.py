@@ -120,13 +120,29 @@ def run(experiment_id: str) -> None:
             # For Unsloth and RAG, we pass the directory or it handles its own logic.
             dataset_path = raw_dir
             
+        # Flush CUDA memory cache before resource checks
+        try:
+            import torch, gc
+            if torch.cuda.is_available():
+                gc.collect()
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+
         resources = adapter.estimate_resources(exp.model_name, df_size, config)
         required_mb = resources.vram_required_mb
         
         if required_mb > 0:
-            available_mb = get_max_free_vram_mb()
+            from backend.gpu_probe import get_gpu_summary
+            available_mb, total_mb = get_gpu_summary()
             if available_mb > 0 and required_mb > available_mb:
-                _write_status(experiment_id, "failed", 0, f"VRAM exceeded. Need {required_mb}MB, got {available_mb}MB.")
+                deficit = required_mb - available_mb
+                _write_status(
+                    experiment_id,
+                    "failed",
+                    0,
+                    f"GPU VRAM deficit: Need {required_mb}MB, but only {available_mb}MB free (out of {total_mb}MB total). Please close background GPU apps (e.g. Lively Wallpaper / video tabs / heavy apps) to free ~{deficit}MB, then retry."
+                )
                 return
         
         # We need a directory to run in

@@ -69,6 +69,15 @@ def get_max_free_vram_mb() -> int:
     return max(g.free_mb for g in gpus)
 
 
+def get_gpu_summary() -> tuple[int, int]:
+    """Return (max_free_mb, total_mb) across detected GPUs, or (0, 0)."""
+    gpus = probe_gpus()
+    if not gpus:
+        return (0, 0)
+    best = max(gpus, key=lambda g: g.free_mb)
+    return (best.free_mb, best.total_mb)
+
+
 if __name__ == "__main__":
     gpus = probe_gpus()
     if not gpus:
