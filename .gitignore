@@ -17,6 +17,7 @@ backend/storage/processed/*
 backend/storage/models/*
 backend/storage/experiments/*
 backend/storage/logs/*
+backend/storage/*.json
 !backend/storage/**/.gitkeep
 
 # === SQLite ===

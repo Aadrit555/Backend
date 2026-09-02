@@ -26,12 +26,12 @@ export default function RootLayout({ children }) {
         {/* React Bits Antigravity 3D Interactive Background */}
         <AntigravityBackground color="#94a3b8" count={260} particleSize={1.8} magnetRadius={1} />
 
-        {/* Ambient Grid and Logo Background */}
+        {/* Ambient Grid and Centered Logo Background */}
         <div className="fixed inset-0 pointer-events-none z-0 bg-grid-pattern opacity-20"></div>
-        <div className="fixed right-0 top-0 bottom-0 w-[50vw] pointer-events-none z-0 overflow-hidden flex items-center justify-end opacity-[0.02]">
+        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center opacity-[0.035]">
           <img
             alt="Unified ML Watermark"
-            className="w-[800px] h-[800px] object-cover translate-x-1/4"
+            className="w-[600px] h-[600px] object-contain select-none"
             src="/logo.png"
           />
         </div>
