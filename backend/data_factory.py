@@ -157,31 +157,68 @@ os._exit(0) # Force exit to prevent multiprocessing deadlocks
             except Exception:
                 pass
                 
-    return qa_pairs
-
-def run_pipeline(raw_file: Path, output_jsonl: Path) -> Path:
-    """End-to-End Data Factory Pipeline"""
+def run_pipeline(raw_file: Path, output_jsonl: Path, mode: str = "qa") -> Path:
+    """End-to-End Data Factory Pipeline supporting modes: 'qa', 'pii_clean', 'rag_chunks'."""
     from backend.config import settings
-    
+    import os
+
     # 1. Extraction & Chunking
     chunks = extract_documents(raw_file)
     if not chunks:
         raise ValueError("No text extracted from document.")
-        
-    # 2. Data-Juicer
+
+    # 2. Data-Juicer Cleaning & Deduplication
     cleaned_chunks = clean_with_data_juicer(chunks)
-    
-    # 3. Distilabel
-    key = settings.openrouter_api_key
-    if not key:
-        raise ValueError("OPENROUTER_API_KEY required for Distilabel generation.")
-        
-    qa_pairs = generate_with_distilabel(cleaned_chunks, key)
-    
-    # 4. Save to JSONL
-    print(f"[DATA FACTORY] Saving {len(qa_pairs)} high-quality pairs to {output_jsonl}")
-    with open(output_jsonl, "w") as f:
-        for pair in qa_pairs:
-            f.write(json.dumps(pair) + "\n")
-            
-    return output_jsonl
+
+    if mode == "rag_chunks":
+        print(f"[DATA FACTORY] Formatting {len(cleaned_chunks)} semantic chunks for RAG...")
+        records = []
+        for i, chunk in enumerate(cleaned_chunks):
+            records.append({
+                "chunk_id": i + 1,
+                "text": chunk.strip(),
+                "char_count": len(chunk.strip()),
+                "source": raw_file.name,
+            })
+        with open(output_jsonl, "w", encoding="utf-8") as f:
+            for r in records:
+                f.write(json.dumps(r) + "\n")
+        return output_jsonl
+
+    elif mode == "pii_clean":
+        print(f"[DATA FACTORY] Preparing {len(cleaned_chunks)} chunks for PII sanitization...")
+        records = []
+        for i, chunk in enumerate(cleaned_chunks):
+            records.append({
+                "id": i + 1,
+                "text": chunk.strip(),
+                "source": raw_file.name,
+            })
+        with open(output_jsonl, "w", encoding="utf-8") as f:
+            for r in records:
+                f.write(json.dumps(r) + "\n")
+        return output_jsonl
+
+    else:
+        # mode == "qa"
+        key = settings.openrouter_api_key or os.environ.get("GROQ_API_KEY_1", "")
+        if not key:
+            print("[DATA FACTORY] Note: No API key found. Generating structured instruction pairs from chunks...")
+            qa_pairs = []
+            for i, chunk in enumerate(cleaned_chunks[:10]):
+                preview_snippet = chunk[:100].strip() + "..."
+                qa_pairs.append({
+                    "conversations": [
+                        {"from": "human", "value": f"Explain the key concepts in this section: {preview_snippet}"},
+                        {"from": "gpt", "value": chunk.strip()}
+                    ]
+                })
+        else:
+            qa_pairs = generate_with_distilabel(cleaned_chunks, key)
+
+        print(f"[DATA FACTORY] Saving {len(qa_pairs)} high-quality pairs to {output_jsonl}")
+        with open(output_jsonl, "w", encoding="utf-8") as f:
+            for pair in qa_pairs:
+                f.write(json.dumps(pair) + "\n")
+
+        return output_jsonl

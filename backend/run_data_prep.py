@@ -4,22 +4,23 @@ from pathlib import Path
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python run_data_prep.py <job_id> <raw_path>")
+        print("Usage: python run_data_prep.py <job_id> <raw_path> [mode]")
         sys.exit(1)
         
     job_id = sys.argv[1]
     raw_path = Path(sys.argv[2])
+    mode = sys.argv[3] if len(sys.argv) > 3 else "qa"
     out_path = raw_path.parent / f"{raw_path.stem}_sanitized.jsonl"
     structured_path = raw_path.parent / f"{raw_path.stem}_structured.jsonl"
     
-    print(f"[DATA FACTORY] Starting data prep job {job_id} for {raw_path}")
+    print(f"[DATA FACTORY] Starting data prep job {job_id} (mode: {mode}) for {raw_path}")
     
     try:
         from backend.data_factory import run_pipeline
         from backend.adapters.unsloth import UnslothAdapter
         
-        # 1. Pipeline (Extraction -> Data-Juicer -> Distilabel)
-        run_pipeline(raw_path, structured_path)
+        # 1. Pipeline (Extraction -> Data-Juicer -> Formatting based on mode)
+        run_pipeline(raw_path, structured_path, mode=mode)
         
         # 2. Sanitize
         adapter = UnslothAdapter()

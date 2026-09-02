@@ -448,7 +448,7 @@ async def chat_with_model(experiment_id: str, req: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
 
 @router.post("/api/data-prep")
-def api_data_prep(file: UploadFile = File(...)):
+def api_data_prep(file: UploadFile = File(...), mode: str = Form("qa")):
     """Start a background data factory job in an isolated subprocess."""
     import tempfile
     import uuid
@@ -469,12 +469,12 @@ def api_data_prep(file: UploadFile = File(...)):
         # Launch isolated subprocess and pipe stdout/stderr to log file
         log_file = open(log_path, "w")
         subprocess.Popen(
-            [sys.executable, "-m", "backend.run_data_prep", job_id, str(raw_path)],
+            [sys.executable, "-m", "backend.run_data_prep", job_id, str(raw_path), mode],
             stdout=log_file,
             stderr=subprocess.STDOUT
         )
         
-        return {"status": "started", "job_id": job_id}
+        return {"status": "started", "job_id": job_id, "mode": mode}
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -484,6 +484,7 @@ def api_data_prep(file: UploadFile = File(...)):
 def api_data_prep_status(job_id: str):
     from backend.config import settings
     import os
+    import json
     
     log_path = settings.logs_dir / f"dataprep_{job_id}.log"
     if not log_path.exists():
@@ -494,14 +495,31 @@ def api_data_prep_status(job_id: str):
         
     final_data = None
     status = "running"
+    preview_records = []
+    stats = {}
     
     for line in logs:
         if "___FINAL_OUTPUT_PATH___:" in line:
             status = "completed"
             out_path = line.split("___FINAL_OUTPUT_PATH___:")[1].strip()
             if os.path.exists(out_path):
-                with open(out_path, "r") as out_f:
+                with open(out_path, "r", encoding="utf-8") as out_f:
                     final_data = out_f.read()
+                records = []
+                for l in final_data.splitlines():
+                    l = l.strip()
+                    if l:
+                        try:
+                            records.append(json.loads(l))
+                        except Exception:
+                            pass
+                preview_records = records[:12]
+                total_chars = sum(len(json.dumps(r)) for r in records)
+                stats = {
+                    "total_records": len(records),
+                    "estimated_tokens": total_chars // 4,
+                    "file_size_kb": round(len(final_data) / 1024, 1),
+                }
             break
         elif "[DATA FACTORY ERROR]" in line:
             status = "failed"
@@ -509,7 +527,9 @@ def api_data_prep_status(job_id: str):
     return {
         "status": status,
         "logs": logs,
-        "content": final_data
+        "content": final_data,
+        "preview_records": preview_records,
+        "stats": stats,
     }
 
 
