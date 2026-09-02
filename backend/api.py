@@ -254,17 +254,46 @@ async def query_rag(experiment_id: str, payload: dict = Body(...)):
             except Exception:
                 pass
 
-        # 3. Beginner-Friendly Zero-Config Fallback: Grounded Contextual Output from Document
+        # 3. Local GPU Model or Clean Structured Synthesis
+        if not decoded and retrieved:
+            global _active_model, _active_tokenizer
+            if _active_model is not None and _active_tokenizer is not None:
+                try:
+                    inputs = _active_tokenizer.apply_chat_template(
+                        messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
+                    ).to("cuda")
+                    gen_out = _active_model.generate(
+                        input_ids=inputs,
+                        max_new_tokens=256,
+                        use_cache=True,
+                        do_sample=False,
+                        pad_token_id=_active_tokenizer.eos_token_id
+                    )
+                    decoded = _active_tokenizer.batch_decode(gen_out[:, inputs.shape[1]:], skip_special_tokens=True)[0]
+                except Exception:
+                    pass
+
+        # 4. Clean Structured Formatting Fallback
         if not decoded:
             if retrieved:
-                sources_summary = []
-                for i, chunk in enumerate(retrieved[:3]):
-                    src = chunk.get("metadata", {}).get("source", "document")
-                    page = chunk.get("metadata", {}).get("page")
-                    loc = f"{src} (Page {page})" if page else src
-                    sources_summary.append(f"**[Source: {loc}]**\n{chunk['text'].strip()}")
+                top_chunk = retrieved[0]
+                text = top_chunk["text"].strip()
+                src = top_chunk.get("metadata", {}).get("source", "Indexed Document")
                 
-                decoded = "\n\n---\n\n".join(sources_summary)
+                clean_text = text.replace("<EMAIL_REDACTED>", "").replace("<PHONE_REDACTED>", "").strip()
+                paragraphs = [p.strip() for p in clean_text.split("\n") if p.strip()]
+                
+                output_lines = [f"### Grounded Response from `{src}`\n"]
+                for p in paragraphs:
+                    upper_p = p.upper()
+                    if any(header in upper_p for header in ["SUMMARY", "EDUCATION", "EXPERIENCE", "PROJECTS", "SKILLS", "AWARDS", "ACHIEVEMENTS"]):
+                        output_lines.append(f"\n**{p}**\n")
+                    elif p.startswith("•") or p.startswith("-"):
+                        output_lines.append(f"• {p.lstrip('•- ')}")
+                    else:
+                        output_lines.append(p)
+                        
+                decoded = "\n".join(output_lines)
             else:
                 decoded = "No matching information found in the indexed document for this query."
 
