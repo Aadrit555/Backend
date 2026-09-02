@@ -213,43 +213,64 @@ async def query_rag(experiment_id: str, payload: dict = Body(...)):
         )
         user_prompt = f"Context:\n{context_text}\n\nQuestion: {query}"
         
-        # Cloud Model for Generation (OpenRouter)
+        # Cloud Model or Zero-Config Local Grounded Synthesis
         import os
         import requests
         
-        openrouter_key = settings.openrouter_api_key
-        if not openrouter_key:
-            raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not found in backend/.env file. Please add it to use the cloud model.")
-            
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
+        decoded = ""
+        openrouter_key = settings.openrouter_api_key or os.environ.get("OPENROUTER_API_KEY", "")
+        groq_key = settings.groq_api_key_1 or os.environ.get("GROQ_API_KEY_1", "")
         
-        try:
-            res = requests.post(
-                url="https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {openrouter_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "nvidia/nemotron-3.5-lightning:free",
-                    "messages": messages
-                },
-                timeout=30
-            )
-            res_data = res.json()
-            if "choices" not in res_data:
-                raise Exception(f"OpenRouter Error: {res_data}")
+        # 1. Try Groq if available
+        if groq_key:
+            try:
+                from backend.orchestrator.groq_client import chat
+                res = chat([{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}], tools=[])
+                decoded = res.get("content", "")
+            except Exception:
+                pass
+
+        # 2. Try OpenRouter if available
+        if not decoded and openrouter_key:
+            try:
+                res = requests.post(
+                    url="https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {openrouter_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": "google/gemini-2.0-flash-lite-preview-02-05:free",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ]
+                    },
+                    timeout=10
+                )
+                res_data = res.json()
+                if "choices" in res_data:
+                    decoded = res_data['choices'][0]['message'].get('content', '')
+            except Exception:
+                pass
+
+        # 3. Beginner-Friendly Zero-Config Fallback: Grounded Contextual Output from Document
+        if not decoded:
+            if retrieved:
+                sources_summary = []
+                for i, chunk in enumerate(retrieved[:3]):
+                    src = chunk.get("metadata", {}).get("source", "document")
+                    page = chunk.get("metadata", {}).get("page")
+                    loc = f"{src} (Page {page})" if page else src
+                    sources_summary.append(f"**[Source: {loc}]**\n{chunk['text'].strip()}")
                 
-            decoded = res_data['choices'][0]['message'].get('content', '')
-            
-        except Exception as req_err:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch from OpenRouter: {str(req_err)}")
-            
+                decoded = "\n\n---\n\n".join(sources_summary)
+            else:
+                decoded = "No matching information found in the indexed document for this query."
+
         return {
             "answer": decoded,
+            "response": decoded,
             "citations": retrieved
         }
         
