@@ -5,7 +5,7 @@ import * as THREE from "three";
 
 export default function AntigravityBackground({
   count = 280,
-  magnetRadius = 12,
+  magnetRadius = 1,
   ringRadius = 10,
   waveSpeed = 0.4,
   waveAmplitude = 1,
@@ -227,3 +227,4 @@ export default function AntigravityBackground({
     />
   );
 }
+

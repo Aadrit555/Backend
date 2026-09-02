@@ -24,7 +24,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="min-h-screen relative font-body-md text-body-md overflow-x-hidden bg-black text-[#E0E0E0]">
         {/* React Bits Antigravity 3D Interactive Background */}
-        <AntigravityBackground color="#94a3b8" count={260} particleSize={1.8} />
+        <AntigravityBackground color="#94a3b8" count={260} particleSize={1.8} magnetRadius={1} />
 
         {/* Ambient Grid and Logo Background */}
         <div className="fixed inset-0 pointer-events-none z-0 bg-grid-pattern opacity-20"></div>
