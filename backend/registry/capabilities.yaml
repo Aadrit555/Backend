@@ -136,6 +136,18 @@ models:
   # World 3: Vision  (BIBLE §19, §47 World 3)
   # =========================================================================
 
+  autotrain_vision:
+    modalities: [image]
+    tasks: [classification, object_detection]
+    training_methods: [autotrain]
+    backends: [autotrain]
+    vram_estimates:
+      autotrain: { min_mb: 8000, recommended_mb: 16000 }
+    license: apache-2.0
+    description: >
+      Hugging Face AutoTrain Advanced. Automatically fine-tunes Vision Transformers
+      (ViT) for Image Classification and Object Detection.
+
   yolov8n:
     modalities: [image, video]
     tasks: [object_detection, classification, segmentation]

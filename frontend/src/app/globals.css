@@ -1,259 +1,55 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap');
-
-:root {
-  --font-primary: "Inter", system-ui, -apple-system, sans-serif;
-  --font-mono: "Fira Code", monospace;
-  
-  --color-bg: #000000;
-  --color-surface: #0a0a0a;
-  --color-surface-hover: #171717;
-  --color-border: #262626;
-  --color-border-hover: #404040;
-  --color-text: #ededed;
-  --color-text-muted: #a3a3a3;
-  
-  --color-accent: #ffffff;
-  --color-accent-fg: #000000;
-  --color-success: #10b981;
-  --color-error: #ef4444;
-  
-  --radius: 6px;
-  --radius-sm: 4px;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 body {
-  font-family: var(--font-primary);
-  background: var(--color-bg);
-  color: var(--color-text);
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
+    background-color: #000000;
+    color: #e2e2e2;
+    cursor: url('/cursor.png') 16 16, auto;
 }
 
-main {
-  max-width: 800px;
-  margin: 4rem auto;
-  padding: 0 2rem;
-  animation: fadeIn 0.4s ease-out;
+/* Grid background overlay */
+.bg-grid-pattern {
+    background-image: 
+        linear-gradient(to right, #1A1A1A 1px, transparent 1px),
+        linear-gradient(to bottom, #1A1A1A 1px, transparent 1px);
+    background-size: 64px 64px;
+    background-position: center top;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-primary);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+/* Custom inputs to match brutalist style */
+input[type="text"], select {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #333333;
+    border-radius: 0;
+    color: #e2e2e2;
+    padding: 8px 0;
+    transition: border-color 0.2s;
 }
 
-h1 {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
-  color: var(--color-text);
+input[type="text"]:focus, select:focus {
+    outline: none;
+    box-shadow: none;
+    border-bottom-color: #00E5FF;
 }
 
-h2 {
-  font-size: 1.1rem;
-  margin-top: 2rem;
-  margin-bottom: 1rem;
-  color: var(--color-text);
-  font-weight: 500;
+select option, select optgroup {
+    background-color: #0e0e0e;
+    color: #e2e2e2;
 }
 
-p {
-  color: var(--color-text-muted);
-  margin-bottom: 2rem;
-  font-size: 0.95rem;
+/* Hide scrollbar for cleaner look */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
 }
-
-/* Card / Surfaces */
-.card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+::-webkit-scrollbar-track {
+    background: #000000;
 }
-
-/* Buttons */
-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 1rem;
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  font-family: var(--font-primary);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-  white-space: nowrap;
+::-webkit-scrollbar-thumb {
+    background: #1A1A1A;
 }
-
-button:hover:not(:disabled) {
-  background: var(--color-surface-hover);
-  border-color: var(--color-border-hover);
-}
-
-button.primary {
-  background: var(--color-accent);
-  color: var(--color-accent-fg);
-  border: 1px solid var(--color-accent);
-  font-weight: 500;
-}
-
-button.primary:hover:not(:disabled) {
-  background: #e5e5e5;
-  border-color: #e5e5e5;
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-a {
-  color: var(--color-text-muted);
-  text-decoration: none;
-  transition: color 0.15s;
-  border-bottom: 1px solid var(--color-border);
-}
-
-a:hover {
-  color: var(--color-text);
-  border-bottom-color: var(--color-text);
-}
-
-/* Inputs & Dropdowns */
-input[type="text"],
-select,
-textarea {
-  width: 100%;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 0.6rem 0.8rem;
-  color: var(--color-text);
-  font-family: var(--font-primary);
-  font-size: 0.9rem;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-input[type="text"]:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--color-border-hover);
-  box-shadow: 0 0 0 1px var(--color-border-hover);
-}
-
-select option {
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-
-/* Dropzone */
-.dropzone {
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius);
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  background: var(--color-surface);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.dropzone:hover {
-  border-color: var(--color-border-hover);
-  background: var(--color-surface-hover);
-}
-
-.dropzone.drag-active {
-  border-color: var(--color-text-muted);
-  background: var(--color-surface-hover);
-}
-
-/* Tables */
-.table-container {
-  width: 100%;
-  overflow-x: auto;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-th, td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--color-border);
-  font-size: 0.875rem;
-}
-
-th {
-  font-weight: 500;
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
-  background: var(--color-bg);
-}
-
-tr:last-child td {
-  border-bottom: none;
-}
-
-/* Utilities */
-.data-mono {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-}
-
-.terminal {
-  background: #000000;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 1rem;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  overflow-y: auto;
-  max-height: 350px;
-}
-
-.terminal .line {
-  margin-bottom: 0.25rem;
-  animation: fadeIn 0.2s ease-out;
-}
-
-.terminal .success { color: var(--color-text); }
-.terminal .error { color: var(--color-error); }
-.terminal .info { color: var(--color-text); opacity: 0.8; }
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.15rem 0.5rem;
-  background: var(--color-border);
-  color: var(--color-text);
-  border-radius: var(--radius-sm);
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-
-/* Keyframes */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+::-webkit-scrollbar-thumb:hover {
+    background: #333333;
 }

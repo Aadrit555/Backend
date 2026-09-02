@@ -54,6 +54,11 @@ def _run_expert_pipeline(project_id: str, pipeline_type: str, expert_config: dic
             candidates = expert_config.get("model_candidates", [])
             model_name = candidates[0] if candidates else "unsloth_llama3.2_1b"
             training_method = "lora"
+        elif pipeline_type == "vision":
+            backend = "autotrain"
+            candidates = expert_config.get("model_candidates", [])
+            model_name = candidates[0] if candidates else "autotrain_vision"
+            training_method = "full"
         else:
             _write_failure(f"Unknown pipeline type: {pipeline_type}")
             return
@@ -284,7 +289,7 @@ async def get_project(project_id: str):
         for ds in datasets_rows:
             for dv in ds.versions:
                 dataset_versions.append(dv)
-        experiments = db.query(Experiment).filter_by(project_id=project_id).all()
+        experiments = db.query(Experiment).filter_by(project_id=project_id).order_by(Experiment.created_at.desc()).all()
         experiments_data = []
         for e in experiments:
             eval_metrics = {}

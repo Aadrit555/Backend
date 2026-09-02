@@ -1,0 +1,342 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Unified ML - Model Builder</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-fixed": "#e4e2e1",
+                      "surface-dim": "#131313",
+                      "secondary-fixed-dim": "#c8c6c5",
+                      "surface": "#131313",
+                      "on-error": "#690005",
+                      "on-secondary-fixed": "#1c1b1b",
+                      "background": "#131313",
+                      "error-container": "#93000a",
+                      "on-tertiary": "#303030",
+                      "tertiary-fixed-dim": "#c8c6c6",
+                      "surface-variant": "#353535",
+                      "on-error-container": "#ffdad6",
+                      "tertiary": "#efecec",
+                      "outline-variant": "#3b494c",
+                      "primary-fixed": "#9cf0ff",
+                      "inverse-surface": "#e2e2e2",
+                      "on-surface": "#e2e2e2",
+                      "outline": "#849396",
+                      "on-primary-fixed-variant": "#004f58",
+                      "surface-container-high": "#2a2a2a",
+                      "on-tertiary-container": "#595959",
+                      "on-surface-variant": "#bac9cc",
+                      "on-tertiary-fixed": "#1b1c1c",
+                      "on-primary": "#00363d",
+                      "surface-container-highest": "#353535",
+                      "primary": "#c3f5ff",
+                      "error": "#ffb4ab",
+                      "surface-tint": "#00daf3",
+                      "secondary-fixed": "#e5e2e1",
+                      "primary-container": "#00e5ff",
+                      "on-secondary": "#313030",
+                      "on-secondary-fixed-variant": "#474746",
+                      "on-background": "#e2e2e2",
+                      "surface-container-lowest": "#0e0e0e",
+                      "on-primary-fixed": "#001f24",
+                      "on-tertiary-fixed-variant": "#474747",
+                      "on-primary-container": "#00626e",
+                      "surface-container": "#1f1f1f",
+                      "inverse-primary": "#006875",
+                      "secondary": "#c8c6c5",
+                      "primary-fixed-dim": "#00daf3",
+                      "surface-container-low": "#1b1b1b",
+                      "surface-bright": "#393939",
+                      "tertiary-container": "#d2d0d0",
+                      "inverse-on-surface": "#303030",
+                      "secondary-container": "#474746",
+                      "on-secondary-container": "#b7b5b4"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "unit": "4px",
+                      "margin-desktop": "40px",
+                      "gutter": "16px",
+                      "margin-mobile": "16px",
+                      "container-max": "1440px"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "Geist"
+                      ],
+                      "headline-lg": [
+                              "Geist"
+                      ],
+                      "label-caps": [
+                              "JetBrains Mono"
+                      ],
+                      "code-sm": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-lg-mobile": [
+                              "Geist"
+                      ],
+                      "display-lg": [
+                              "Geist"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "label-caps": [
+                              "11px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.15em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "code-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "1.1",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        body {
+            background-color: #000000;
+            color: #e2e2e2;
+        }
+        
+        /* Grid background overlay */
+        .bg-grid-pattern {
+            background-image: 
+                linear-gradient(to right, #1A1A1A 1px, transparent 1px),
+                linear-gradient(to bottom, #1A1A1A 1px, transparent 1px);
+            background-size: 64px 64px;
+            background-position: center top;
+        }
+
+        /* Custom inputs to match brutalist style */
+        input[type="text"], select {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #333333;
+            border-radius: 0;
+            color: #e2e2e2;
+            padding: 8px 0;
+            transition: border-color 0.2s;
+        }
+        
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            box-shadow: none;
+            border-bottom-color: #00E5FF;
+        }
+
+        /* Hide scrollbar for cleaner look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1A1A1A;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #333333;
+        }
+      </style>
+</head>
+<body class="min-h-screen relative font-body-md text-body-md overflow-x-hidden">
+<!-- Ambient Grid and Logo Background -->
+<div class="fixed inset-0 pointer-events-none z-0 bg-grid-pattern opacity-30"></div>
+<div class="fixed right-0 top-0 bottom-0 w-[50vw] pointer-events-none z-0 overflow-hidden flex items-center justify-end opacity-[0.03]">
+<img alt="Unified ML Watermark" class="w-[800px] h-[800px] object-cover translate-x-1/4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCg6waKfh_IMCgJxif68oNl0WrBtpY3Kjbw_RAGT1zYFGh7-QZLxA7KlXSym5rMQYQtZ4vd3gtB2pFpMu_HRLvqOiZqZDfuals5GV3s7rgwmR4S6aYwSr1wAvN0Ko7lB11KwWHvmB57EHa1z1fsLdT2rCkmwSJhIxP1sbtb2PtBtvmCRcL76lBYdDVfaq5sn_x9gMGyGxdTSlP67KJ8Mq2wXCnEmWYM0emBk_T1UuQE8K58GhJU9UkxFBNZqzvG7vH4kw">
+</div>
+<!-- TopNavBar -->
+<nav class="bg-background dark:bg-background border-b border-outline-variant docked full-width top-0 relative z-50">
+<div class="flex justify-between items-center h-12 w-full px-margin-desktop max-w-container-max mx-auto">
+<!-- Brand -->
+<div class="flex items-center gap-3">
+<img alt="Unified ML Logo" class="h-6 w-6 object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfy41Lj7OrVBAxsfl1TG4zK-MSoawswtrsehb8od3upgu9HXXirXweeZx0fMbOieftER480f8SKkRZlSw6a40qxWVUWqYSK2pzigBMwIvvOEv7euYNtX_Z9jqI-9TXJLG9FGp4YkkGnWTlKyf2C4wQ29dFk4YimCIjb8pZJ0fMwSTdrrrxNzdDacaBjoBocMnHwevrHbln6Gd7II2w_Y1IIlrDGjPjhHfFzr6akhiOlbFVe3MDXNmi7XLq94kWdt8q2Q">
+<span class="text-label-caps font-label-caps font-bold tracking-widest text-on-background dark:text-on-background uppercase">
+                    UNIFIED ML
+                </span>
+</div>
+<!-- Navigation Links -->
+<div class="hidden md:flex items-center h-full gap-8">
+<!-- Active Nav Item -->
+<a class="h-full flex items-center text-primary dark:text-primary border-b-2 border-primary pt-[2px] font-bold text-label-caps font-label-caps hover:text-primary-fixed-dim transition-colors duration-200" href="#">
+                    MODEL BUILDER
+                </a>
+<!-- Inactive Nav Item -->
+<a class="h-full flex items-center text-on-surface-variant dark:text-on-surface-variant border-b-2 border-transparent pt-[2px] text-label-caps font-label-caps hover:text-primary-fixed-dim transition-colors duration-200" href="#">
+                    DATA FACTORY
+                </a>
+</div>
+<!-- Trailing Actions -->
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary-fixed-dim transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary-fixed-dim transition-colors">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</div>
+</nav>
+<!-- Main Workspace -->
+<main class="relative z-10 max-w-container-max mx-auto px-margin-desktop py-margin-desktop min-h-[calc(100vh-48px)] flex flex-col md:flex-row gap-16">
+<!-- Left Column: Core Builder -->
+<div class="w-full flex flex-col gap-12 mx-auto max-w-container-max">
+<!-- Hero Header -->
+<header class="flex flex-col gap-4">
+<span class="text-label-caps font-label-caps text-on-surface-variant">MODEL BUILDER / 01</span>
+<div>
+<h1 class="text-display-lg font-display-lg text-on-background mb-2">Build your model.</h1>
+<p class="text-body-md font-body-md text-on-surface-variant max-w-xl">
+                        Select your pipeline, provide your training data, and define your optimization objective. We construct and tune the model architecture automatically.
+                    </p>
+</div>
+</header>
+<!-- Pipeline Selector -->
+<section class="flex flex-col gap-6">
+<h2 class="text-label-caps font-label-caps text-on-surface-variant border-b border-[#1A1A1A] pb-2">PIPELINE SELECTION</h2>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+<!-- Active Pipeline -->
+<button class="flex flex-col gap-2 p-4 bg-[#0A0A0A] border border-[#00E5FF] text-left transition-colors relative group">
+<div class="absolute top-0 right-0 p-2 opacity-100">
+<div class="w-2 h-2 bg-[#00E5FF]"></div>
+</div>
+<span class="text-label-caps font-label-caps text-[#00E5FF]">01 TABULAR ML</span>
+<span class="text-code-sm font-code-sm text-on-surface-variant group-hover:text-on-background transition-colors">Structured data prediction</span>
+</button>
+<!-- Inactive Pipelines -->
+<button class="flex flex-col gap-2 p-4 bg-[#0A0A0A] border border-[#1A1A1A] text-left hover:border-[#333333] transition-colors relative group">
+<span class="text-label-caps font-label-caps text-on-surface-variant group-hover:text-on-background transition-colors">02 LLM FINE-TUNING</span>
+<span class="text-code-sm font-code-sm text-[#595959]">Instruction tuning</span>
+</button>
+<button class="flex flex-col gap-2 p-4 bg-[#0A0A0A] border border-[#1A1A1A] text-left hover:border-[#333333] transition-colors relative group">
+<span class="text-label-caps font-label-caps text-on-surface-variant group-hover:text-on-background transition-colors">03 RAG Q&amp;A</span>
+<span class="text-code-sm font-code-sm text-[#595959]">Document intelligence</span>
+</button>
+<button class="flex flex-col gap-2 p-4 bg-[#0A0A0A] border border-[#1A1A1A] text-left hover:border-[#333333] transition-colors relative group">
+<span class="text-label-caps font-label-caps text-on-surface-variant group-hover:text-on-background transition-colors">04 COMPUTER VISION</span>
+<span class="text-code-sm font-code-sm text-[#595959]">Image classification</span>
+</button>
+</div>
+</section>
+<!-- Builder Form Area -->
+<section class="bg-[#0A0A0A] border border-[#1A1A1A] flex flex-col">
+<!-- Model Section -->
+<div class="p-6 border-b border-[#1A1A1A] flex flex-col md:flex-row gap-6 items-start md:items-center">
+<div class="w-48 flex-shrink-0">
+<label class="text-label-caps font-label-caps text-on-surface-variant">RECOMMENDED MODEL</label>
+</div>
+<div class="flex-grow flex items-center justify-between border-b border-[#333333] pb-2 group hover:border-[#00E5FF] transition-colors cursor-pointer w-full">
+<span class="text-body-md font-body-md text-on-background">AutoGluon Best</span>
+<span class="text-label-caps font-label-caps text-on-surface-variant group-hover:text-[#00E5FF] transition-colors">[ SELECT ↓ ]</span>
+</div>
+</div>
+<!-- Dataset Section -->
+<div class="p-6 border-b border-[#1A1A1A] flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<label class="text-label-caps font-label-caps text-on-surface-variant">TRAINING DATASET</label>
+<span class="text-code-sm font-code-sm text-[#595959]">CSV · XLSX · PARQUET</span>
+</div>
+<div class="border border-dashed border-[#333333] hover:border-[#00E5FF] transition-colors bg-[#131313] p-12 flex flex-col items-center justify-center gap-4 cursor-pointer group">
+<span class="material-symbols-outlined text-4xl text-[#595959] group-hover:text-[#00E5FF] transition-colors" data-icon="cloud_upload">cloud_upload</span>
+<div class="text-center flex flex-col gap-1">
+<span class="text-body-md font-body-md text-on-background">Drop your dataset here</span>
+<span class="text-code-sm font-code-sm text-[#595959]">or click to browse local files</span>
+</div>
+<button class="mt-4 px-6 py-2 border border-[#1A1A1A] text-label-caps font-label-caps text-on-background hover:border-[#00E5FF] transition-colors">
+                            [ BROWSE FILES ]
+                        </button>
+</div>
+</div>
+<!-- Objective Section -->
+<div class="p-6 flex flex-col md:flex-row gap-6 items-start md:items-center">
+<div class="w-48 flex-shrink-0">
+<label class="text-label-caps font-label-caps text-on-surface-variant">OPTIMIZATION OBJECTIVE</label>
+</div>
+<div class="flex-grow w-full">
+<input class="w-full text-body-md font-body-md font-code-sm placeholder:text-[#595959]" placeholder="[ Describe your objective... ]" type="text">
+<p class="text-code-sm font-code-sm text-[#595959] mt-2">e.g., "Predict customer churn probability" or "Maximize AUC-ROC"</p>
+</div>
+</div>
+</section>
+<!-- Action Area -->
+<div class="flex justify-end pt-4">
+<button class="bg-[#00E5FF] text-black px-8 py-3 text-label-caps font-label-caps font-bold hover:bg-white hover:text-black transition-colors flex items-center gap-2">
+                    BUILD MODEL <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Right Column: Contextual Visual Area (mostly empty for atmosphere) -->
+
+</main>
+<!-- Footer -->
+<footer class="bg-background dark:bg-background full-width bottom-0 mt-40">
+<div class="flex flex-col md:flex-row justify-between items-center py-6 px-margin-desktop w-full border-t border-outline-variant max-w-container-max mx-auto">
+<div class="text-label-caps font-label-caps text-on-surface-variant mb-4 md:mb-0">
+                © 2024 UNIFIED ML INFRASTRUCTURE. ALL RIGHTS RESERVED.
+            </div>
+<div class="flex flex-wrap justify-center gap-6">
+<a class="text-label-caps font-label-caps text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors" href="#">DOCUMENTATION</a>
+<a class="text-label-caps font-label-caps text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors" href="#">API REFERENCE</a>
+<a class="text-label-caps font-label-caps text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors" href="#">SUPPORT</a>
+<a class="text-label-caps font-label-caps text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors" href="#">SYSTEM STATUS</a>
+</div>
+</div>
+</footer>
+
+
+</body></html>

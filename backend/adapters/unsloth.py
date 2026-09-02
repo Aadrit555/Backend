@@ -307,7 +307,12 @@ with open("{input_jsonl}", "r") as fin, open("{output_jsonl}", "w") as fout:
         dataset = standardize_sharegpt(dataset)
         
         def formatting_func(examples):
-            convos = examples["conversations"]
+            convos = examples.get("conversations") or examples.get("messages")
+            if convos is None:
+                if "text" in examples:
+                    return {"text": examples["text"]}
+                else:
+                    raise ValueError(f"Dataset missing required keys ('conversations', 'messages', or 'text'). Found: {list(examples.keys())}")
             texts = [tokenizer.apply_chat_template(convo, tokenize=False, add_generation_prompt=False) for convo in convos]
             return { "text" : texts, }
             

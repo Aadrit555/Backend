@@ -33,3 +33,23 @@ frontend/out/
 .vscode/
 *.swp
 *.swo
+
+# === Outputs and Temporary Data ===
+outputs/
+unsloth_compiled_cache/
+*.jsonl
+*.csv
+*.zip
+*.txt
+*.log
+
+# === Test Scripts ===
+/test_*.py
+/generate_samples.py
+
+# === Exclude Specific Necessary Files ===
+!requirements.txt
+!backend/requirements.txt
+!employee_handbook.txt
+!README.md
+!ARCHITECTURE.md

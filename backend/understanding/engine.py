@@ -258,6 +258,35 @@ def extract_document(path: Path) -> list[dict[str, Any]]:
         except Exception as e:
             print(f"Error extracting TXT {path}: {e}")
             
+    elif ftype == "json":
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                # Try JSONL format first
+                for line in f:
+                    if not line.strip(): continue
+                    try:
+                        record = json.loads(line)
+                        text = record.get("text", "")
+                        if text:
+                            chunks.append({
+                                "text": text.strip(),
+                                "metadata": record.get("metadata", {"source": path.name})
+                            })
+                    except json.JSONDecodeError:
+                        # Fallback to standard JSON array if first line isn't JSONL
+                        f.seek(0)
+                        data = json.load(f)
+                        if isinstance(data, list):
+                            for record in data:
+                                if isinstance(record, dict) and record.get("text"):
+                                    chunks.append({
+                                        "text": record["text"].strip(),
+                                        "metadata": record.get("metadata", {"source": path.name})
+                                    })
+                        break
+        except Exception as e:
+            print(f"Error extracting JSON {path}: {e}")
+            
     return chunks
 
 def detect_relationships(project_id: str) -> dict[str, Any]:

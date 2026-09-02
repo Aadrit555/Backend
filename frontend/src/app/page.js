@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { UploadCloud, CheckCircle2, AlertCircle, Terminal, Play, Cpu, Server, DownloadCloud } from "lucide-react";
+import { UploadCloud, CheckCircle2, DownloadCloud, Play } from "lucide-react";
 import Link from "next/link";
 
 export default function BeginnerPage() {
-  const [projectId] = useState(`proj_${Math.random().toString(36).substr(2, 9)}`);
+  const [projectId, setProjectId] = useState("proj_init");
+  
+  useEffect(() => {
+    setProjectId(`proj_${Math.random().toString(36).substr(2, 9)}`);
+  }, []);
+
   const [modelCandidate, setModelCandidate] = useState("autogluon_best");
   const [activeTab, setActiveTab] = useState("tabular");
   const [files, setFiles] = useState([]);
@@ -28,7 +33,6 @@ export default function BeginnerPage() {
   const logsEndRef = useRef(null);
 
   // Poll for status
-  // Helper to format an ISO timestamp to HH:MM:SS.mmm
   const fmtTime = (iso) => {
     if (!iso) return "--:--:--.---";
     try {
@@ -38,11 +42,23 @@ export default function BeginnerPage() {
   };
 
   useEffect(() => {
+    // Reset state when switching tabs
+    setFiles([]);
+    setManifest(null);
+    setIsUploading(false);
+    setIsBuilding(false);
+    setExperimentId(null);
+    setExperimentBackend(null);
+    setStatusLogs([]);
+    setFinalMetrics(null);
+    setRagQuery("");
+    setRagChat([]);
+    
     switch (activeTab) {
       case "tabular": setModelCandidate("autogluon_best"); break;
       case "llm": setModelCandidate("unsloth/Llama-3.2-1B-Instruct-bnb-4bit"); break;
       case "rag": setModelCandidate("rag_default"); break;
-      case "vision": setModelCandidate("yolov8"); break;
+      case "vision": setModelCandidate("autotrain_vision"); break;
     }
   }, [activeTab]);
 
@@ -55,13 +71,9 @@ export default function BeginnerPage() {
         if (!res.ok) return;
         const data = await res.json();
         
-        // Backend returns { ...current, log: [...entries] }
-        // Merge backend log with our frontend-only entries (started, planning, execution)
         if (data.log && data.log.length > 0) {
           setStatusLogs(prev => {
-            // Keep frontend-only entries (ones without updated_at from backend training)
             const frontendEntries = prev.filter(e => e._frontend);
-            // Backend entries already have real timestamps
             const backendEntries = data.log.map(e => ({ ...e, _backend: true }));
             return [...frontendEntries, ...backendEntries];
           });
@@ -105,17 +117,20 @@ export default function BeginnerPage() {
 
   const handleDragOver = (e) => {
     e.preventDefault();
-    e.currentTarget.classList.add("drag-active");
+    e.currentTarget.classList.add("border-[#00E5FF]");
+    e.currentTarget.classList.remove("border-[#333333]");
   };
 
   const handleDragLeave = (e) => {
     e.preventDefault();
-    e.currentTarget.classList.remove("drag-active");
+    e.currentTarget.classList.remove("border-[#00E5FF]");
+    e.currentTarget.classList.add("border-[#333333]");
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
-    e.currentTarget.classList.remove("drag-active");
+    e.currentTarget.classList.remove("border-[#00E5FF]");
+    e.currentTarget.classList.add("border-[#333333]");
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFiles(Array.from(e.dataTransfer.files));
     }
@@ -252,273 +267,346 @@ export default function BeginnerPage() {
   };
 
   const TABS = [
-    { id: "tabular", label: "Tabular ML", placeholder: "e.g. 'Predict whether a machine will fail based on the sensor readings.'", fileHint: "Upload CSV, Excel, or Parquet files" },
-    { id: "llm", label: "LLM Fine-Tuning", placeholder: "e.g. 'Fine-tune a model to output strict JSON responses.'", fileHint: "Upload ShareGPT .jsonl files" },
-    { id: "rag", label: "RAG Q&A", placeholder: "e.g. 'Create an index to answer questions about these PDFs.'", fileHint: "Upload PDF or TXT documents" },
-    { id: "vision", label: "Computer Vision", placeholder: "e.g. 'Detect cars and pedestrians in images.'", fileHint: "Upload Images or ZIP archives" }
+    { id: "tabular", num: "01", label: "TABULAR ML", desc: "Structured data prediction", placeholder: "e.g., 'Predict customer churn probability' or 'Maximize AUC-ROC'", fileHint: "CSV · XLSX · PARQUET" },
+    { id: "llm", num: "02", label: "LLM FINE-TUNING", desc: "Instruction tuning", placeholder: "e.g., 'Fine-tune a model to output strict JSON responses.'", fileHint: "JSONL" },
+    { id: "rag", num: "03", label: "RAG Q&A", desc: "Document intelligence", placeholder: "e.g., 'Create an index to answer questions about these PDFs.'", fileHint: "PDF · TXT · MD" },
+    { id: "vision", num: "04", label: "COMPUTER VISION", desc: "Image classification", placeholder: "e.g., 'Detect cars and pedestrians in images.'", fileHint: "ZIP · PNG · JPG" }
   ];
 
   return (
-    <main>
-      <h1>Unified Model Builder</h1>
-      <p>Select your pipeline, provide your data, and define your objective. We construct the model.</p>
-
-      <div style={{ display: "flex", gap: "10px", marginBottom: "2rem", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
-        {TABS.map(tab => (
-          <button 
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{ 
-              padding: "0.5rem 1rem", 
-              background: activeTab === tab.id ? "#3b82f6" : "transparent",
-              color: activeTab === tab.id ? "#fff" : "#aaa",
-              border: "1px solid",
-              borderColor: activeTab === tab.id ? "#3b82f6" : "#444",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <section className="card">
-        <h2>Model Selection</h2>
-        <select 
-          value={modelCandidate} 
-          onChange={(e) => setModelCandidate(e.target.value)}
-          disabled={isBuilding}
-        >
-          {activeTab === "tabular" && (
-            <optgroup label="Tabular / AutoGluon">
-              <option value="autogluon_best">AutoGluon Best</option>
-            </optgroup>
-          )}
-          {activeTab === "llm" && (
-            <>
-              <optgroup label="LLM / Unsloth Llama Series">
-                <option value="unsloth/Llama-3.2-1B-Instruct-bnb-4bit">Llama 3.2 1B Instruct</option>
-                <option value="unsloth/Llama-3.2-3B-Instruct-bnb-4bit">Llama 3.2 3B Instruct</option>
-                <option value="unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit">Llama 3.1 8B Instruct</option>
-                <option value="unsloth/Meta-Llama-3.1-70B-Instruct-bnb-4bit">Llama 3.1 70B Instruct</option>
-                <option value="unsloth/Llama-3.3-70B-Instruct-bnb-4bit">Llama 3.3 70B Instruct</option>
-              </optgroup>
-              <optgroup label="LLM / Unsloth DeepSeek Series">
-                <option value="unsloth/DeepSeek-R1-Distill-Llama-8B-bnb-4bit">DeepSeek R1 (Distill Llama 8B)</option>
-                <option value="unsloth/DeepSeek-R1-Distill-Qwen-1.5B-bnb-4bit">DeepSeek R1 (Distill Qwen 1.5B)</option>
-                <option value="unsloth/DeepSeek-R1-Distill-Qwen-7B-bnb-4bit">DeepSeek R1 (Distill Qwen 7B)</option>
-                <option value="unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit">DeepSeek R1 (Distill Qwen 14B)</option>
-                <option value="unsloth/DeepSeek-R1-Distill-Qwen-32B-bnb-4bit">DeepSeek R1 (Distill Qwen 32B)</option>
-              </optgroup>
-              <optgroup label="LLM / Unsloth Qwen Series">
-                <option value="unsloth/Qwen2.5-0.5B-Instruct-bnb-4bit">Qwen 2.5 0.5B Instruct</option>
-                <option value="unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit">Qwen 2.5 1.5B Instruct</option>
-                <option value="unsloth/Qwen2.5-3B-Instruct-bnb-4bit">Qwen 2.5 3B Instruct</option>
-                <option value="unsloth/Qwen2.5-7B-Instruct-bnb-4bit">Qwen 2.5 7B Instruct</option>
-                <option value="unsloth/Qwen2.5-14B-Instruct-bnb-4bit">Qwen 2.5 14B Instruct</option>
-                <option value="unsloth/Qwen2.5-32B-Instruct-bnb-4bit">Qwen 2.5 32B Instruct</option>
-                <option value="unsloth/Qwen2.5-72B-Instruct-bnb-4bit">Qwen 2.5 72B Instruct</option>
-              </optgroup>
-              <optgroup label="LLM / Unsloth Coder Series">
-                <option value="unsloth/Qwen2.5-Coder-1.5B-Instruct-bnb-4bit">Qwen 2.5 Coder 1.5B Instruct</option>
-                <option value="unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit">Qwen 2.5 Coder 7B Instruct</option>
-                <option value="unsloth/Qwen2.5-Coder-32B-Instruct-bnb-4bit">Qwen 2.5 Coder 32B Instruct</option>
-                <option value="unsloth/Llama-3-8B-Instruct-Coder-bnb-4bit">Llama 3 8B Coder</option>
-              </optgroup>
-              <optgroup label="LLM / Unsloth Mistral & Gemma & Phi">
-                <option value="unsloth/mistral-7b-instruct-v0.3-bnb-4bit">Mistral 7B Instruct v0.3</option>
-                <option value="unsloth/Mistral-Nemo-Instruct-2407-bnb-4bit">Mistral Nemo 12B Instruct</option>
-                <option value="unsloth/gemma-2-2b-it-bnb-4bit">Gemma 2 2B Instruct</option>
-                <option value="unsloth/gemma-2-9b-it-bnb-4bit">Gemma 2 9B Instruct</option>
-                <option value="unsloth/gemma-2-27b-it-bnb-4bit">Gemma 2 27B Instruct</option>
-                <option value="unsloth/Phi-3.5-mini-instruct-bnb-4bit">Phi 3.5 Mini Instruct</option>
-              </optgroup>
-            </>
-          )}
-          {activeTab === "rag" && (
-            <optgroup label="RAG / Document Q&A">
-              <option value="rag_default">RAG Index (FAISS + Embeddings)</option>
-            </optgroup>
-          )}
-          {activeTab === "vision" && (
-            <optgroup label="Computer Vision">
-              <option value="yolov8">YOLOv8 Default</option>
-            </optgroup>
-          )}
-        </select>
-      </section>
-
-      <section className="card">
-        <h2>Data Ingestion</h2>
-        {!manifest ? (
-          <div 
-            className="dropzone"
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <UploadCloud size={32} style={{ marginBottom: "1rem", opacity: 0.7 }} />
-            <div>
-              {isUploading ? "Uploading..." : "Click or drag & drop files here"}
-            </div>
-            <div style={{ fontSize: "0.8rem", color: "#888", marginTop: "0.5rem" }}>
-              {TABS.find(t => t.id === activeTab).fileHint}
-            </div>
-            <input 
-              type="file" 
-              multiple 
-              hidden 
-              ref={fileInputRef} 
-              onChange={(e) => handleFiles(Array.from(e.target.files))}
-            />
+    <div className="relative z-10 max-w-[1440px] mx-auto px-margin-desktop py-margin-desktop min-h-[calc(100vh-48px)] flex flex-col md:flex-row gap-16">
+      
+      <div className="w-full flex flex-col gap-12 mx-auto max-w-[1440px]">
+        {/* Hero Header */}
+        <header className="flex flex-col gap-4">
+          <span className="text-label-caps font-label-caps text-on-surface-variant">MODEL BUILDER / 01</span>
+          <div>
+            <h1 className="text-display-lg font-display-lg text-on-background mb-2">Build your model.</h1>
+            <p className="text-body-md font-body-md text-on-surface-variant max-w-xl">
+              Select your pipeline and provide your training data. We construct and tune the model architecture automatically.
+            </p>
           </div>
-        ) : (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Filename</th>
-                  <th>Type</th>
-                  <th>Size</th>
-                </tr>
-              </thead>
-              <tbody>
-                {manifest.map((item, i) => (
-                  <tr key={i}>
-                    <td className="data-mono">
-                      <CheckCircle2 size={14} className="success" style={{ display: "inline", verticalAlign: "middle", marginRight: "6px" }}/>
-                      {item.filename}
-                    </td>
-                    <td><span className="badge">{item.file_type}</span></td>
-                    <td className="data-mono">{(item.size_bytes / 1024).toFixed(1)} KB</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+        </header>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <button 
-          className="primary" 
-          onClick={handleBuild} 
-          disabled={!manifest || isBuilding}
-        >
-          <Play size={16} style={{ marginRight: "8px" }}/> 
-          {isBuilding ? "BUILDING..." : "BUILD MY MODEL"}
-        </button>
-      </div>
-
-      {statusLogs.length > 0 && (
-        <section className="card" style={{ marginTop: "2rem" }}>
-          <h2>Pipeline Execution Log</h2>
-          <div className="terminal">
-            {statusLogs.map((log, idx) => (
-              <div key={idx} className="line">
-                <span style={{ color: "#555", marginRight: "1rem" }}>{fmtTime(log.updated_at)}</span>
-                <span style={{ color: log.stage === "failed" ? "#f87171" : "#a1a1aa", textTransform: "uppercase", width: "100px", display: "inline-block" }}>
-                  [{log.stage}]
-                </span>
-                <span className={log.stage === "completed" ? "success" : ""}>{log.message}</span>
-                {log.pct > 0 && <span style={{ marginLeft: "1rem", color: "#60a5fa" }}>{log.pct}%</span>}
-              </div>
-            ))}
-            <div ref={logsEndRef} />
-          </div>
-        </section>
-      )}
-
-      {finalMetrics && finalMetrics.leaderboard && (
-        <section className="card" style={{ marginTop: "2rem", marginBottom: "4rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-            <h2>Training Results</h2>
-            <a 
-              href={`http://localhost:8000/api/experiments/${experimentId}/download`}
-              className="primary"
-              style={{ padding: "0.6rem 1.2rem", textDecoration: "none", display: "inline-flex", alignItems: "center", fontSize: "0.85rem", fontWeight: "600", borderRadius: "4px" }}
-              download
-            >
-              <DownloadCloud size={16} style={{ marginRight: "8px" }} />
-              Download Model
-            </a>
-          </div>
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Model</th>
-                  <th>Score</th>
-                  <th>Fit Time (s)</th>
-                  <th>Pred Time (s)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {finalMetrics.leaderboard
-                  .sort((a, b) => b.score - a.score)
-                  .map((row, i) => (
-                  <tr key={i} style={row.is_best ? { backgroundColor: "rgba(96, 165, 250, 0.1)" } : {}}>
-                    <td>
-                      <span style={{ fontWeight: row.is_best ? 600 : 400 }}>{row.model_name}</span>
-                      {row.is_best && <span className="badge" style={{ marginLeft: "10px", backgroundColor: "#3b82f6", color: "#fff", borderColor: "#3b82f6" }}>BEST</span>}
-                    </td>
-                    <td className="data-mono">{row.score.toFixed(4)}</td>
-                    <td className="data-mono">{row.fit_time.toFixed(2)}</td>
-                    <td className="data-mono">{row.pred_time.toFixed(4)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {(experimentBackend === "unsloth" || (finalMetrics && finalMetrics.retrieval_accuracy !== undefined)) && (
-        <section className="card" style={{ marginTop: "2rem", marginBottom: "4rem" }}>
-          <h2>{experimentBackend === "unsloth" ? "LLM Chat Interface" : "RAG Chat Interface"}</h2>
-          <div className="terminal" style={{ backgroundColor: "#1e1e1e", color: "#d4d4d4", padding: "1.5rem", borderRadius: "8px", minHeight: "300px", display: "flex", flexDirection: "column" }}>
-            <div style={{ flex: 1, overflowY: "auto", marginBottom: "1rem" }}>
-              {ragChat.map((msg, i) => (
-                <div key={i} style={{ marginBottom: "1.5rem" }}>
-                  <strong style={{ color: msg.role === "user" ? "#60a5fa" : "#34d399" }}>
-                    {msg.role === "user" ? "You: " : "AI: "}
-                  </strong>
-                  <span style={{ lineHeight: "1.5" }}>{msg.content}</span>
-                  {msg.citations && msg.citations.length > 0 && (
-                    <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", borderLeft: "2px solid #555", paddingLeft: "10px", color: "#999" }}>
-                      <strong>Sources:</strong>
-                      <ul style={{ margin: "4px 0 0 0", paddingLeft: "20px" }}>
-                        {msg.citations.map((c, idx) => (
-                          <li key={idx}>
-                            {c.metadata.source} {c.metadata.page ? `(Page ${c.metadata.page})` : ""}
-                          </li>
-                        ))}
-                      </ul>
+        {/* Pipeline Selector */}
+        <section className="flex flex-col gap-6">
+          <h2 className="text-label-caps font-label-caps text-on-surface-variant border-b border-[#1A1A1A] pb-2">PIPELINE SELECTION</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {TABS.map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button 
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex flex-col gap-2 p-4 bg-[#0A0A0A] border text-left transition-colors relative group ${isActive ? "border-[#00E5FF]" : "border-[#1A1A1A] hover:border-[#333333]"}`}
+                >
+                  {isActive && (
+                    <div className="absolute top-0 right-0 p-2 opacity-100">
+                      <div className="w-2 h-2 bg-[#00E5FF]"></div>
                     </div>
                   )}
-                </div>
-              ))}
-              {isQuerying && <div style={{ color: "#aaa", fontStyle: "italic" }}>
-                {experimentBackend === "unsloth" ? "Loading model (this takes 10-15s on first boot) or generating answer..." : "Generating answer..."}
-              </div>}
-            </div>
-            <form onSubmit={handleChatSubmit} style={{ display: "flex", gap: "10px" }}>
-              <input 
-                type="text" 
-                value={ragQuery}
-                onChange={e => setRagQuery(e.target.value)}
-                placeholder={experimentBackend === "unsloth" ? "Chat with your fine-tuned model..." : "Ask a question based on your documents..."}
-                style={{ flex: 1, padding: "0.8rem", borderRadius: "4px", border: "1px solid #444", background: "#2d2d2d", color: "#fff" }}
-                disabled={isQuerying}
-              />
-              <button type="submit" className="primary" disabled={isQuerying || !ragQuery.trim()}>Ask</button>
-
-            </form>
+                  <span className={`text-label-caps font-label-caps transition-colors ${isActive ? "text-[#00E5FF]" : "text-on-surface-variant group-hover:text-on-background"}`}>
+                    {tab.num} {tab.label}
+                  </span>
+                  <span className={`text-code-sm font-code-sm transition-colors ${isActive ? "text-on-surface-variant group-hover:text-on-background" : "text-[#595959]"}`}>
+                    {tab.desc}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </section>
-      )}
-    </main>
+
+        {/* Builder Form Area */}
+        <section className="bg-[#0A0A0A] border border-[#1A1A1A] flex flex-col">
+          {/* Model Section */}
+          <div className="p-6 border-b border-[#1A1A1A] flex flex-col md:flex-row gap-6 items-start md:items-center">
+            <div className="w-48 flex-shrink-0">
+              <label className="text-label-caps font-label-caps text-on-surface-variant">RECOMMENDED MODEL</label>
+            </div>
+            <div className="flex-grow flex items-center justify-between border-b border-[#333333] pb-2 group hover:border-[#00E5FF] transition-colors cursor-pointer w-full relative">
+              <select 
+                value={modelCandidate} 
+                onChange={(e) => setModelCandidate(e.target.value)}
+                disabled={isBuilding}
+                className="w-full text-body-md font-body-md text-on-background appearance-none cursor-pointer outline-none border-none bg-transparent m-0 p-0 shadow-none focus:outline-none focus:ring-0 focus:border-none focus:shadow-none"
+                style={{ borderBottom: "none" }}
+              >
+                {activeTab === "tabular" && (
+                  <optgroup label="Tabular / AutoGluon">
+                    <option value="autogluon_best">AutoGluon Best</option>
+                  </optgroup>
+                )}
+                {activeTab === "llm" && (
+                  <>
+                    <optgroup label="LLM / Unsloth Llama Series">
+                      <option value="unsloth/Llama-3.2-1B-Instruct-bnb-4bit">Llama 3.2 1B Instruct</option>
+                      <option value="unsloth/Llama-3.2-3B-Instruct-bnb-4bit">Llama 3.2 3B Instruct</option>
+                      <option value="unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit">Llama 3.1 8B Instruct</option>
+                      <option value="unsloth/Meta-Llama-3.1-70B-Instruct-bnb-4bit">Llama 3.1 70B Instruct</option>
+                      <option value="unsloth/Llama-3.3-70B-Instruct-bnb-4bit">Llama 3.3 70B Instruct</option>
+                    </optgroup>
+                    <optgroup label="LLM / Unsloth DeepSeek Series">
+                      <option value="unsloth/DeepSeek-R1-Distill-Llama-8B-bnb-4bit">DeepSeek R1 (Distill Llama 8B)</option>
+                      <option value="unsloth/DeepSeek-R1-Distill-Qwen-1.5B-bnb-4bit">DeepSeek R1 (Distill Qwen 1.5B)</option>
+                      <option value="unsloth/DeepSeek-R1-Distill-Qwen-7B-bnb-4bit">DeepSeek R1 (Distill Qwen 7B)</option>
+                      <option value="unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit">DeepSeek R1 (Distill Qwen 14B)</option>
+                      <option value="unsloth/DeepSeek-R1-Distill-Qwen-32B-bnb-4bit">DeepSeek R1 (Distill Qwen 32B)</option>
+                    </optgroup>
+                    <optgroup label="LLM / Unsloth Qwen Series">
+                      <option value="unsloth/Qwen2.5-0.5B-Instruct-bnb-4bit">Qwen 2.5 0.5B Instruct</option>
+                      <option value="unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit">Qwen 2.5 1.5B Instruct</option>
+                      <option value="unsloth/Qwen2.5-3B-Instruct-bnb-4bit">Qwen 2.5 3B Instruct</option>
+                      <option value="unsloth/Qwen2.5-7B-Instruct-bnb-4bit">Qwen 2.5 7B Instruct</option>
+                      <option value="unsloth/Qwen2.5-14B-Instruct-bnb-4bit">Qwen 2.5 14B Instruct</option>
+                      <option value="unsloth/Qwen2.5-32B-Instruct-bnb-4bit">Qwen 2.5 32B Instruct</option>
+                      <option value="unsloth/Qwen2.5-72B-Instruct-bnb-4bit">Qwen 2.5 72B Instruct</option>
+                    </optgroup>
+                    <optgroup label="LLM / Unsloth Coder Series">
+                      <option value="unsloth/Qwen2.5-Coder-1.5B-Instruct-bnb-4bit">Qwen 2.5 Coder 1.5B Instruct</option>
+                      <option value="unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit">Qwen 2.5 Coder 7B Instruct</option>
+                      <option value="unsloth/Qwen2.5-Coder-32B-Instruct-bnb-4bit">Qwen 2.5 Coder 32B Instruct</option>
+                      <option value="unsloth/Llama-3-8B-Instruct-Coder-bnb-4bit">Llama 3 8B Coder</option>
+                    </optgroup>
+                    <optgroup label="LLM / Unsloth Mistral & Gemma & Phi">
+                      <option value="unsloth/mistral-7b-instruct-v0.3-bnb-4bit">Mistral 7B Instruct v0.3</option>
+                      <option value="unsloth/Mistral-Nemo-Instruct-2407-bnb-4bit">Mistral Nemo 12B Instruct</option>
+                      <option value="unsloth/gemma-2-2b-it-bnb-4bit">Gemma 2 2B Instruct</option>
+                      <option value="unsloth/gemma-2-9b-it-bnb-4bit">Gemma 2 9B Instruct</option>
+                      <option value="unsloth/gemma-2-27b-it-bnb-4bit">Gemma 2 27B Instruct</option>
+                      <option value="unsloth/Phi-3.5-mini-instruct-bnb-4bit">Phi 3.5 Mini Instruct</option>
+                    </optgroup>
+                  </>
+                )}
+                {activeTab === "rag" && (
+                  <optgroup label="RAG / Document Q&A">
+                    <option value="rag_default">RAG Index (FAISS + Embeddings)</option>
+                  </optgroup>
+                )}
+                {activeTab === "vision" && (
+                  <optgroup label="Computer Vision">
+                    <option value="autotrain_vision">HF AutoTrain (Vision Transformers)</option>
+                  </optgroup>
+                )}
+              </select>
+              <span className="absolute right-0 top-1/2 -translate-y-1/2 text-label-caps font-label-caps text-on-surface-variant group-hover:text-[#00E5FF] transition-colors pointer-events-none bg-[#0A0A0A] pl-2">
+                [ SELECT ↓ ]
+              </span>
+            </div>
+          </div>
+
+          {/* Dataset Section */}
+          <div className="p-6 border-b border-[#1A1A1A] flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <label className="text-label-caps font-label-caps text-on-surface-variant">TRAINING DATASET</label>
+              <span className="text-code-sm font-code-sm text-[#595959]">{TABS.find(t => t.id === activeTab).fileHint}</span>
+            </div>
+            
+            {!manifest ? (
+              <div 
+                className="border border-dashed border-[#333333] hover:border-[#00E5FF] transition-colors bg-[#131313] p-12 flex flex-col items-center justify-center gap-4 cursor-pointer group"
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <span className="material-symbols-outlined text-4xl text-[#595959] group-hover:text-[#00E5FF] transition-colors" data-icon="cloud_upload">cloud_upload</span>
+                <div className="text-center flex flex-col gap-1">
+                  <span className="text-body-md font-body-md text-on-background">
+                    {isUploading ? "Uploading..." : "Drop your dataset here"}
+                  </span>
+                  <span className="text-code-sm font-code-sm text-[#595959]">or click to browse local files</span>
+                </div>
+                <button className="mt-4 px-6 py-2 border border-[#1A1A1A] text-label-caps font-label-caps text-on-background hover:border-[#00E5FF] transition-colors">
+                    [ BROWSE FILES ]
+                </button>
+                <input 
+                  type="file" 
+                  multiple 
+                  hidden 
+                  ref={fileInputRef} 
+                  onChange={(e) => handleFiles(Array.from(e.target.files))}
+                />
+              </div>
+            ) : (
+              <div className="border border-[#1A1A1A] bg-[#131313] w-full">
+                <table className="w-full text-left">
+                  <thead className="border-b border-[#1A1A1A] bg-[#0A0A0A]">
+                    <tr>
+                      <th className="p-3 text-label-caps font-label-caps text-[#595959]">FILENAME</th>
+                      <th className="p-3 text-label-caps font-label-caps text-[#595959]">TYPE</th>
+                      <th className="p-3 text-label-caps font-label-caps text-[#595959]">SIZE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {manifest.map((item, i) => (
+                      <tr key={i} className="border-b border-[#1A1A1A] last:border-b-0 hover:bg-[#1f1f1f] transition-colors">
+                        <td className="p-3 text-code-sm font-code-sm text-on-background flex items-center gap-2">
+                          <CheckCircle2 size={14} className="text-[#00E5FF]" />
+                          {item.filename}
+                        </td>
+                        <td className="p-3">
+                          <span className="text-label-caps font-label-caps px-2 py-1 bg-[#1A1A1A] text-on-surface-variant border border-[#333333]">
+                            {item.file_type}
+                          </span>
+                        </td>
+                        <td className="p-3 text-code-sm font-code-sm text-[#595959]">
+                          {(item.size_bytes / 1024).toFixed(1)} KB
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+        </section>
+
+        {/* Action Area */}
+        <div className="flex justify-end pt-4">
+          <button 
+            className="bg-[#00E5FF] text-black px-8 py-3 text-label-caps font-label-caps font-bold hover:bg-white hover:text-black transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleBuild}
+            disabled={!manifest || isBuilding}
+          >
+            {isBuilding ? "BUILDING..." : "BUILD MODEL"} <span className="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+          </button>
+        </div>
+
+        {/* Status Logs (Brutalist Terminal) */}
+        {statusLogs.length > 0 && (
+          <section className="flex flex-col gap-4 mt-8">
+            <h2 className="text-label-caps font-label-caps text-on-surface-variant border-b border-[#1A1A1A] pb-2">PIPELINE EXECUTION LOG</h2>
+            <div className="bg-[#0e0e0e] border border-[#1A1A1A] p-4 h-64 overflow-y-auto">
+              {statusLogs.map((log, idx) => (
+                <div key={idx} className="flex gap-4 mb-2 text-code-sm font-code-sm">
+                  <span className="text-[#595959] shrink-0">{fmtTime(log.updated_at)}</span>
+                  <span className={`shrink-0 w-24 uppercase ${log.stage === "failed" ? "text-error" : "text-on-surface-variant"}`}>
+                    [{log.stage}]
+                  </span>
+                  <span className={log.stage === "completed" ? "text-[#00E5FF]" : "text-on-background"}>
+                    {log.message}
+                  </span>
+                  {log.pct > 0 && <span className="text-[#00E5FF] shrink-0">{log.pct}%</span>}
+                </div>
+              ))}
+              <div ref={logsEndRef} />
+            </div>
+          </section>
+        )}
+
+        {/* Results & Chat */}
+        {finalMetrics && finalMetrics.leaderboard && (
+          <section className="flex flex-col gap-4 mt-8">
+            <div className="flex justify-between items-end border-b border-[#1A1A1A] pb-2">
+              <h2 className="text-label-caps font-label-caps text-on-surface-variant">TRAINING RESULTS</h2>
+              <a 
+                href={`http://localhost:8000/api/experiments/${experimentId}/download`}
+                className="text-label-caps font-label-caps text-[#00E5FF] hover:text-white transition-colors flex items-center gap-1"
+                download
+              >
+                [ DOWNLOAD MODEL ]
+              </a>
+            </div>
+            
+            <div className="border border-[#1A1A1A] bg-[#0e0e0e] w-full">
+              <table className="w-full text-left">
+                <thead className="border-b border-[#1A1A1A] bg-[#131313]">
+                  <tr>
+                    <th className="p-3 text-label-caps font-label-caps text-[#595959]">MODEL</th>
+                    <th className="p-3 text-label-caps font-label-caps text-[#595959]">SCORE</th>
+                    <th className="p-3 text-label-caps font-label-caps text-[#595959]">FIT TIME (S)</th>
+                    <th className="p-3 text-label-caps font-label-caps text-[#595959]">PRED TIME (S)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {finalMetrics.leaderboard
+                    .sort((a, b) => b.score - a.score)
+                    .map((row, i) => (
+                    <tr key={i} className={`border-b border-[#1A1A1A] last:border-b-0 ${row.is_best ? "bg-[#00363d]/30" : "hover:bg-[#1f1f1f]"}`}>
+                      <td className="p-3 text-code-sm font-code-sm text-on-background flex items-center gap-2">
+                        {row.is_best && <div className="w-2 h-2 bg-[#00E5FF]"></div>}
+                        {row.model_name}
+                      </td>
+                      <td className="p-3 text-code-sm font-code-sm text-[#00E5FF]">{row.score.toFixed(4)}</td>
+                      <td className="p-3 text-code-sm font-code-sm text-[#595959]">{row.fit_time.toFixed(2)}</td>
+                      <td className="p-3 text-code-sm font-code-sm text-[#595959]">{row.pred_time.toFixed(4)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* Inference / Chat UI */}
+        {(experimentBackend === "unsloth" || (finalMetrics && finalMetrics.retrieval_accuracy !== undefined)) && (
+          <section className="flex flex-col gap-4 mt-8 mb-24">
+            <h2 className="text-label-caps font-label-caps text-on-surface-variant border-b border-[#1A1A1A] pb-2">
+              {experimentBackend === "unsloth" ? "INFERENCE ENDPOINT" : "RAG ENDPOINT"}
+            </h2>
+            
+            <div className="bg-[#0e0e0e] border border-[#1A1A1A] p-6 flex flex-col min-h-[400px]">
+              <div className="flex-1 overflow-y-auto mb-4 flex flex-col gap-6">
+                {ragChat.length === 0 && (
+                  <div className="text-code-sm font-code-sm text-[#595959] italic text-center mt-10">
+                    Endpoint active. Awaiting input...
+                  </div>
+                )}
+                
+                {ragChat.map((msg, i) => (
+                  <div key={i} className="flex flex-col gap-1">
+                    <span className={`text-label-caps font-label-caps ${msg.role === "user" ? "text-on-surface-variant" : "text-[#00E5FF]"}`}>
+                      {msg.role === "user" ? "INPUT_QUERY" : "MODEL_OUTPUT"}
+                    </span>
+                    <div className="text-body-md font-body-md text-on-background whitespace-pre-wrap">
+                      {msg.content}
+                    </div>
+                    {msg.citations && msg.citations.length > 0 && (
+                      <div className="mt-2 pl-4 border-l border-[#333333] flex flex-col gap-1">
+                        <span className="text-label-caps font-label-caps text-[#595959]">CONTEXT CITATIONS</span>
+                        <ul className="list-none m-0 p-0 text-code-sm font-code-sm text-[#595959]">
+                          {msg.citations.map((c, idx) => (
+                            <li key={idx}>
+                              [{idx + 1}] {c.metadata.source} {c.metadata.page ? `(Page ${c.metadata.page})` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                
+                {isQuerying && (
+                  <div className="text-code-sm font-code-sm text-[#00E5FF] animate-pulse">
+                    Processing request...
+                  </div>
+                )}
+              </div>
+              
+              <form onSubmit={handleChatSubmit} className="flex gap-4 border-t border-[#1A1A1A] pt-4">
+                <input 
+                  type="text" 
+                  value={ragQuery}
+                  onChange={e => setRagQuery(e.target.value)}
+                  placeholder="Enter query..."
+                  disabled={isQuerying}
+                  className="flex-1 bg-transparent border-none border-b border-[#333333] text-body-md font-body-md text-on-background p-2 focus:border-[#00E5FF] focus:outline-none transition-colors"
+                />
+                <button 
+                  type="submit" 
+                  disabled={isQuerying || !ragQuery.trim()}
+                  className="bg-transparent border border-[#333333] text-on-surface-variant px-6 py-2 text-label-caps font-label-caps hover:border-[#00E5FF] hover:text-[#00E5FF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  [ SEND ]
+                </button>
+              </form>
+            </div>
+          </section>
+        )}
+
+      </div>
+    </div>
   );
 }

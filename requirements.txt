@@ -1,23 +1,39 @@
-# Core
+# === Core API & Server ===
 fastapi>=0.111,<1
 uvicorn[standard]>=0.30,<1
+python-multipart>=0.0.9,<1
 pydantic-settings>=2,<3
 sqlalchemy>=2,<3
+requests>=2.31,<3
 
-# Groq orchestrator
+# === Orchestration ===
 groq>=0.9,<1
 
-# ML backends (install as needed per adapter)
-# autogluon.tabular
-# ultralytics
-# llama-factory  (pip install llamafactory)
-# unsloth
+# === ML Backends & Fine-Tuning ===
+# AutoGluon & Vision
+autogluon
+ultralytics
 
-# Data
+# Unsloth Stack
+unsloth
+unsloth-zoo
+trl
+peft
+accelerate
+bitsandbytes
+xformers
+datasets
+transformers
+
+# RAG & Embeddings
+sentence-transformers
+faiss-cpu
+
+# === Data Processing ===
 pandas>=2,<3
 pyyaml>=6,<7
 
-# Testing
+# === Testing ===
 pytest>=8,<9
 pytest-asyncio>=0.23,<1
 httpx>=0.27,<1

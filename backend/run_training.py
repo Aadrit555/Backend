@@ -86,6 +86,9 @@ def run(experiment_id: str) -> None:
         elif exp.backend == "rag":
             from backend.adapters.rag import RagAdapter
             adapter = RagAdapter()
+        elif exp.backend == "autotrain":
+            from backend.adapters.autotrain import AutoTrainAdapter
+            adapter = AutoTrainAdapter()
         else:
             _write_status(experiment_id, "failed", 0, f"Unsupported backend: {exp.backend}")
             return
