@@ -1,5 +1,31 @@
 [
   {
+    "id": "nvidia/llama-nemotron-embed-1b-v2",
+    "name": "llama-nemotron-embed-1b-v2",
+    "author": "nvidia",
+    "pipeline_type": "llm",
+    "pipeline_tag": "feature-extraction",
+    "backend": "unsloth",
+    "modalities": [
+      "text"
+    ],
+    "tasks": [
+      "fine_tuning"
+    ],
+    "training_methods": [
+      "lora"
+    ],
+    "vram_estimates": {
+      "lora": {
+        "min_mb": 1024,
+        "recommended_mb": 2048
+      }
+    },
+    "downloads": 609776,
+    "likes": 61,
+    "imported_at": "2026-09-02T23:09:28.829543+00:00"
+  },
+  {
     "id": "keremberke/yolov8n-table-extraction",
     "name": "yolov8n-table-extraction",
     "author": "keremberke",

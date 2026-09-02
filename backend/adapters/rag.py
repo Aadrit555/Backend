@@ -21,6 +21,95 @@ from backend.adapters.base import (
 from backend.config import settings
 from backend.registry.loader import get_model_capabilities
 
+def extract_document(file_path: Path) -> list[dict[str, Any]]:
+    """Extract document text objects from JSONL, JSON, DOCX, PDF, or TXT."""
+    docs = []
+    suffix = file_path.suffix.lower()
+    
+    if suffix == ".jsonl":
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            for i, line in enumerate(f):
+                line = line.strip()
+                if not line: continue
+                try:
+                    obj = json.loads(line)
+                    if "conversations" in obj:
+                        text = "\n".join([f"{c.get('from', 'speaker')}: {c.get('value', '')}" for c in obj["conversations"]])
+                    elif "text" in obj:
+                        text = str(obj["text"])
+                    else:
+                        text = json.dumps(obj)
+                    docs.append({
+                        "text": text,
+                        "metadata": {"source": file_path.name, "line": i + 1}
+                    })
+                except Exception:
+                    pass
+    elif suffix == ".json":
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    for i, item in enumerate(data):
+                        docs.append({
+                            "text": json.dumps(item) if isinstance(item, dict) else str(item),
+                            "metadata": {"source": file_path.name, "index": i}
+                        })
+                else:
+                    docs.append({
+                        "text": json.dumps(data),
+                        "metadata": {"source": file_path.name}
+                    })
+        except Exception:
+            pass
+    elif suffix == ".docx":
+        try:
+            import zipfile
+            import xml.etree.ElementTree as ET
+            with zipfile.ZipFile(file_path) as docx:
+                xml_content = docx.read("word/document.xml")
+                tree = ET.fromstring(xml_content)
+                paragraphs = []
+                for p in tree.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"):
+                    texts = [node.text for node in p.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t") if node.text]
+                    if texts:
+                        paragraphs.append("".join(texts))
+                text = "\n\n".join(paragraphs)
+                docs.append({
+                    "text": text,
+                    "metadata": {"source": file_path.name}
+                })
+        except Exception:
+            docs.append({
+                "text": file_path.read_text(errors="ignore"),
+                "metadata": {"source": file_path.name}
+            })
+    elif suffix == ".pdf":
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(str(file_path))
+            for page_idx, page in enumerate(reader.pages):
+                page_text = page.extract_text() or ""
+                if page_text.strip():
+                    docs.append({
+                        "text": page_text,
+                        "metadata": {"source": file_path.name, "page": page_idx + 1}
+                    })
+        except Exception:
+            docs.append({
+                "text": file_path.read_text(errors="ignore"),
+                "metadata": {"source": file_path.name}
+            })
+    else:
+        text = file_path.read_text(encoding="utf-8", errors="ignore")
+        docs.append({
+            "text": text,
+            "metadata": {"source": file_path.name}
+        })
+        
+    return docs
+
+
 class RagAdapter(BackendAdapter):
     def capabilities(self) -> dict[str, Any]:
         info = get_model_capabilities("rag_default")
@@ -46,12 +135,9 @@ class RagAdapter(BackendAdapter):
         For RAG, prepare() reads the raw files, chunks them, and generates embeddings.
         This prepares the data for FAISS index construction in train().
         """
-        from backend.understanding.engine import extract_document
         from backend.rag.chunking import chunk_documents
         from backend.rag.embeddings import embed_chunks
         
-        # In a real pipeline, dataset_path points to raw files or a manifest.
-        # For simplicity, if dataset_path is a directory, iterate over its files.
         all_docs = []
         if dataset_path.is_dir():
             for file in dataset_path.iterdir():
