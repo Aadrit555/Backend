@@ -356,30 +356,52 @@ export default function DataPrepPage() {
                   </div>
                 </div>
 
-                {/* View switcher */}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPreviewTab("cards")}
-                    className={`px-2.5 py-1 text-label-caps font-label-caps transition-colors flex items-center gap-1 border ${
-                      previewTab === "cards"
-                        ? "border-[#00E5FF] bg-[#00E5FF]/10 text-white"
-                        : "border-[#252525] bg-[#141414] text-[#777777] hover:text-white"
-                    }`}
-                  >
-                    <Eye size={12} /> CARDS VIEW
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewTab("jsonl")}
-                    className={`px-2.5 py-1 text-label-caps font-label-caps transition-colors flex items-center gap-1 border ${
-                      previewTab === "jsonl"
-                        ? "border-[#00E5FF] bg-[#00E5FF]/10 text-white"
-                        : "border-[#252525] bg-[#141414] text-[#777777] hover:text-white"
-                    }`}
-                  >
-                    <Code size={12} /> RAW JSONL
-                  </button>
+                {/* View switcher & Action buttons */}
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTab("cards")}
+                      className={`px-2.5 py-1 text-label-caps font-label-caps transition-colors flex items-center gap-1.5 border cursor-pointer ${
+                        previewTab === "cards"
+                          ? "border-[#00E5FF] bg-[#00E5FF]/15 text-[#00E5FF] font-bold"
+                          : "border-[#252525] bg-[#141414] text-[#777777] hover:text-white"
+                      }`}
+                    >
+                      <Eye size={12} /> CARDS VIEW
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTab("jsonl")}
+                      className={`px-2.5 py-1 text-label-caps font-label-caps transition-colors flex items-center gap-1.5 border cursor-pointer ${
+                        previewTab === "jsonl"
+                          ? "border-[#00E5FF] bg-[#00E5FF]/15 text-[#00E5FF] font-bold"
+                          : "border-[#252525] bg-[#141414] text-[#777777] hover:text-white"
+                      }`}
+                    >
+                      <Code size={12} /> RAW JSONL
+                    </button>
+                  </div>
+
+                  {/* Prominent Action Buttons */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={copyToClipboard}
+                      className="px-3 py-1 text-label-caps font-label-caps transition-all flex items-center gap-1.5 border border-[#333333] bg-[#161616] text-[#CCCCCC] hover:text-white hover:border-[#666666] text-xs cursor-pointer"
+                    >
+                      {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                      <span>{copied ? "[ COPIED ]" : "[ COPY ALL ]"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={downloadResult}
+                      className="px-3.5 py-1.5 text-label-caps font-label-caps font-bold transition-all flex items-center gap-1.5 bg-[#00E5FF] text-black hover:bg-white text-xs cursor-pointer shadow-[0_0_12px_rgba(0,229,255,0.3)]"
+                    >
+                      <Download size={14} className="text-black stroke-[2.5]" />
+                      <span>[ DOWNLOAD JSONL ]</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

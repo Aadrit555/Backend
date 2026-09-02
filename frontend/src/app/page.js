@@ -838,8 +838,8 @@ export default function BeginnerPage() {
                 type="button"
                 onClick={() => setVisionSubMode("classifier")}
                 className={`pb-3 text-label-caps font-label-caps border-b-2 transition-colors flex items-center gap-2 ${visionSubMode === "classifier" || visionSubMode === "teachable"
-                    ? "border-[#00E5FF] text-[#00E5FF]"
-                    : "border-transparent text-on-surface-variant hover:text-on-background"
+                  ? "border-[#00E5FF] text-[#00E5FF]"
+                  : "border-transparent text-on-surface-variant hover:text-on-background"
                   }`}
               >
                 <Sparkles size={14} className={visionSubMode === "classifier" || visionSubMode === "teachable" ? "text-[#00E5FF]" : "text-[#595959]"} />
@@ -849,8 +849,8 @@ export default function BeginnerPage() {
                 type="button"
                 onClick={() => setVisionSubMode("detection")}
                 className={`pb-3 text-label-caps font-label-caps border-b-2 transition-colors flex items-center gap-2 ${visionSubMode === "detection"
-                    ? "border-[#00E5FF] text-[#00E5FF]"
-                    : "border-transparent text-on-surface-variant hover:text-on-background"
+                  ? "border-[#00E5FF] text-[#00E5FF]"
+                  : "border-transparent text-on-surface-variant hover:text-on-background"
                   }`}
               >
                 <ImageIcon size={14} className={visionSubMode === "detection" ? "text-[#00E5FF]" : "text-[#595959]"} />

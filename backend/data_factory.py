@@ -7,16 +7,50 @@ def chunk_text(text: str, chunk_size: int = 1500) -> list[str]:
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size) if len(text[i:i+chunk_size].strip()) > 50]
 
 def extract_documents(raw_file: Path) -> list[str]:
-    """Step 1: Document extraction and Chunking"""
+    """Step 1: Document extraction and Chunking supporting TXT, PDF, DOCX, HTML, JSON."""
     print(f"[DATA FACTORY] Extracting and chunking {raw_file}...")
-    try:
-        from unstructured.partition.auto import partition
-        elements = partition(filename=str(raw_file))
-        text = "\n\n".join([str(el) for el in elements])
-    except Exception as e:
-        print(f"[DATA FACTORY] Unstructured partition failed ({e}), falling back to basic text read...")
-        text = raw_file.read_text(errors="ignore")
-        
+    text = ""
+    
+    # Check if .docx (extract XML paragraphs directly from Word zip package)
+    if raw_file.suffix.lower() == ".docx":
+        try:
+            import zipfile
+            import xml.etree.ElementTree as ET
+            with zipfile.ZipFile(raw_file) as docx:
+                xml_content = docx.read("word/document.xml")
+                tree = ET.fromstring(xml_content)
+                paragraphs = []
+                for p in tree.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"):
+                    texts = [node.text for node in p.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t") if node.text]
+                    if texts:
+                        paragraphs.append("".join(texts))
+                text = "\n\n".join(paragraphs)
+            print(f"[DATA FACTORY] Successfully extracted {len(text)} characters from DOCX.")
+        except Exception as e:
+            print(f"[DATA FACTORY] DOCX extraction error: {e}")
+
+    # Check if .pdf
+    elif raw_file.suffix.lower() == ".pdf":
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(str(raw_file))
+            text = "\n\n".join([page.extract_text() or "" for page in reader.pages])
+            print(f"[DATA FACTORY] Successfully extracted {len(text)} characters from PDF.")
+        except Exception as e:
+            print(f"[DATA FACTORY] PDF extraction error: {e}")
+
+    # Fallback to unstructured or direct utf-8 text read
+    if not text.strip():
+        try:
+            from unstructured.partition.auto import partition
+            elements = partition(filename=str(raw_file))
+            text = "\n\n".join([str(el) for el in elements])
+        except Exception:
+            try:
+                text = raw_file.read_text(encoding="utf-8")
+            except Exception:
+                text = raw_file.read_text(errors="ignore")
+
     return chunk_text(text)
 
 def clean_with_data_juicer(chunks: list[str]) -> list[str]:
