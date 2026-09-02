@@ -149,23 +149,68 @@ def generate_with_distilabel(cleaned_chunks: list[str], api_key: str = "") -> li
             except Exception:
                 pass
 
-    # Instant heuristic local generation fallback
+    # Universal semantic document-to-instruction decomposition (works on ANY document)
     if not qa_pairs:
-        print("[DATA FACTORY] Applying zero-latency heuristic Q&A extraction...")
-        for i, chunk in enumerate(cleaned_chunks[:15]):
-            lines = [line.strip() for line in chunk.split("\n") if line.strip()]
-            if not lines:
-                continue
-            heading = lines[0] if len(lines[0]) < 80 else f"Section {i+1}"
-            content = "\n".join(lines[1:]) if len(lines) > 1 else lines[0]
-            if len(content) < 20:
-                continue
+        print("[DATA FACTORY] Performing universal semantic Q&A extraction across document sections...")
+        
+        # 1. Global Document Summary Question
+        overview_snippet = "\n\n".join([c.strip() for c in cleaned_chunks[:2]])
+        if len(overview_snippet) > 50:
             qa_pairs.append({
                 "conversations": [
-                    {"from": "human", "value": f"What are the details regarding {heading}?"},
-                    {"from": "gpt", "value": content.strip()}
+                    {"from": "human", "value": "Provide a comprehensive summary of this document and its key information."},
+                    {"from": "gpt", "value": overview_snippet}
                 ]
             })
+
+        # 2. Extract specific topics, paragraphs, and entities across every chunk
+        for chunk_idx, chunk in enumerate(cleaned_chunks):
+            paragraphs = [p.strip() for p in chunk.split("\n\n") if len(p.strip()) > 30]
+            if not paragraphs:
+                paragraphs = [chunk.strip()]
+
+            for p_idx, para in enumerate(paragraphs):
+                lines = [l.strip() for l in para.splitlines() if l.strip()]
+                if not lines:
+                    continue
+                
+                # Derive semantic topic from leading line or sentence
+                first_line = lines[0].strip("•-*# ")
+                topic = first_line if len(first_line) < 70 else first_line[:60] + "..."
+                content = "\n".join(lines) if len(lines) > 1 else para
+
+                # Question Formulation 1: Direct Topic Query
+                qa_pairs.append({
+                    "conversations": [
+                        {"from": "human", "value": f"What does the document state regarding {topic}?"},
+                        {"from": "gpt", "value": content}
+                    ]
+                })
+
+                # Question Formulation 2: Explanatory / Detail Query
+                if len(content) > 80:
+                    qa_pairs.append({
+                        "conversations": [
+                            {"from": "human", "value": f"Explain the details and context of {topic}."},
+                            {"from": "gpt", "value": content}
+                        ]
+                    })
+
+                # If the first paragraph is an identity/header (common in resumes, specs, manuals)
+                if chunk_idx == 0 and p_idx == 0 and len(first_line.split()) <= 6:
+                    entity_name = first_line
+                    qa_pairs.append({
+                        "conversations": [
+                            {"from": "human", "value": f"Who or what is {entity_name}?"},
+                            {"from": "gpt", "value": content}
+                        ]
+                    })
+                    qa_pairs.append({
+                        "conversations": [
+                            {"from": "human", "value": f"Tell me about {entity_name}."},
+                            {"from": "gpt", "value": content}
+                        ]
+                    })
 
     return qa_pairs
                 

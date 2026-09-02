@@ -319,9 +319,9 @@ class UnslothAdapter(BackendAdapter):
         print("Applying LoRA adapters...")
         model = FastLanguageModel.get_peft_model(
             model,
-            r=8,
+            r=16,
             target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-            lora_alpha=16,
+            lora_alpha=32,
             lora_dropout=0,
             bias="none",
             use_gradient_checkpointing="unsloth",
@@ -358,16 +358,16 @@ class UnslothAdapter(BackendAdapter):
 
         training_args = SFTConfig(
             per_device_train_batch_size=batch_size,
-            gradient_accumulation_steps=4,
+            gradient_accumulation_steps=2,
             warmup_steps=2,
-            max_steps=10, # Exact limit to prove gradients work
-            learning_rate=2e-4,
+            max_steps=25,
+            learning_rate=3e-4,
             fp16=not is_bfloat16_supported(),
             bf16=is_bfloat16_supported(),
             logging_steps=1,
             optim="adamw_8bit",
             weight_decay=0.01,
-            lr_scheduler_type="linear",
+            lr_scheduler_type="cosine",
             seed=3407,
             output_dir=str(model_out_dir),
             max_length=max_seq_length,
