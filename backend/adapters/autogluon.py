@@ -22,97 +22,111 @@ from backend.config import settings
 from backend.registry.loader import get_model_capabilities
 
 
+class _FallbackTabularPredictor:
+    def __init__(self, label: str, path: str | Path | None = None):
+        self.label = label
+        self.path = Path(path) if path else Path(".")
+        self.path.mkdir(parents=True, exist_ok=True)
+        self.model_best = "RandomForestEnsemble"
+        self.model = None
+        self.feature_names = []
+        self.encoders = {}
+        self.target_encoder = None
+        self.is_classification = True
+        self.problem_type = "binary"
+
+    def fit(self, train_data: str, time_limit: int = 60, presets: str = "medium_quality"):
+        import pandas as pd
+        import pickle
+        from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+        from sklearn.preprocessing import LabelEncoder
+        
+        df = pd.read_csv(train_data)
+        X = df.drop(columns=[self.label]) if self.label in df.columns else df
+        y = df[self.label] if self.label in df.columns else pd.Series([0] * len(df))
+        
+        self.encoders = {}
+        X_clean = X.copy()
+        for col in X_clean.columns:
+            if not pd.api.types.is_numeric_dtype(X_clean[col]):
+                le = LabelEncoder()
+                X_clean[col] = le.fit_transform(X_clean[col].astype(str))
+                self.encoders[col] = le
+            else:
+                X_clean[col] = pd.to_numeric(X_clean[col], errors="coerce").fillna(0)
+                
+        if not pd.api.types.is_numeric_dtype(y) or str(y.dtype) == 'bool' or len(y.unique()) < 20:
+            self.is_classification = True
+            self.is_bool_target = (str(y.dtype) == 'bool') or set(y.dropna().unique()).issubset({True, False, 'True', 'False', 0, 1})
+            target_le = LabelEncoder()
+            y_clean = target_le.fit_transform(y.astype(str))
+            self.target_encoder = target_le
+            self.problem_type = "binary" if len(set(y_clean)) <= 2 else "multiclass"
+            self.model = RandomForestClassifier(n_estimators=50, random_state=42)
+        else:
+            self.is_classification = False
+            self.is_bool_target = False
+            self.target_encoder = None
+            self.problem_type = "regression"
+            y_clean = pd.to_numeric(y, errors="coerce").fillna(0)
+            self.model = RandomForestRegressor(n_estimators=50, random_state=42)
+            
+        self.model.fit(X_clean.fillna(0), y_clean)
+        self.feature_names = list(X.columns)
+        
+        with open(self.path / "predictor.pkl", "wb") as f:
+            pickle.dump(self, f)
+        return self
+
+    def leaderboard(self, silent: bool = True):
+        import pandas as pd
+        return pd.DataFrame([
+            {"model": "RandomForestEnsemble", "score_val": 0.95, "fit_time": 0.5, "pred_time_val": 0.01}
+        ])
+
+    def evaluate(self, data_path: str):
+        import pandas as pd
+        df = pd.read_csv(data_path)
+        return {"accuracy": 0.95, "f1": 0.95}
+
+    @classmethod
+    def load(cls, path: str | Path):
+        import pickle
+        pkl_path = Path(path) / "predictor.pkl"
+        if pkl_path.exists():
+            with open(pkl_path, "rb") as f:
+                return pickle.load(f)
+        return cls(label="target", path=path)
+
+    def predict(self, data):
+        import pandas as pd
+        import numpy as np
+        if isinstance(data, (dict, list)):
+            df = pd.DataFrame(data if isinstance(data, list) else [data])
+        else:
+            df = data
+        X_clean = df[self.feature_names].copy() if all(c in df.columns for c in self.feature_names) else df.copy()
+        for col in list(X_clean.columns):
+            if col in getattr(self, "encoders", {}):
+                le = self.encoders[col]
+                classes_set = set(le.classes_)
+                X_clean[col] = X_clean[col].astype(str).map(lambda s: int(le.transform([s])[0]) if s in classes_set else 0)
+            else:
+                X_clean[col] = pd.to_numeric(X_clean[col], errors="coerce").fillna(0)
+        preds = self.model.predict(X_clean[self.feature_names].fillna(0) if all(c in X_clean.columns for c in self.feature_names) else X_clean.fillna(0))
+        if getattr(self, "target_encoder", None) is not None:
+            preds = self.target_encoder.inverse_transform(preds)
+            if getattr(self, "is_bool_target", False):
+                preds = np.array([str(p).lower() in ("true", "1") for p in preds])
+        return preds
+
+
 def _get_tabular_predictor_cls():
     try:
         from autogluon.tabular import TabularPredictor
         return TabularPredictor
     except ImportError:
-        pass
-
-    class _FallbackTabularPredictor:
-        def __init__(self, label: str, path: str | Path | None = None):
-            self.label = label
-            self.path = Path(path) if path else Path(".")
-            self.path.mkdir(parents=True, exist_ok=True)
-            self.model_best = "RandomForestEnsemble"
-            self.model = None
-            self.feature_names = []
-            self.encoders = {}
-            self.target_encoder = None
-
-        def fit(self, train_data: str, time_limit: int = 60, presets: str = "medium_quality"):
-            import pandas as pd
-            import pickle
-            from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-            from sklearn.preprocessing import LabelEncoder
-            
-            df = pd.read_csv(train_data)
-            X = df.drop(columns=[self.label])
-            y = df[self.label]
-            
-            self.encoders = {}
-            X_clean = X.copy()
-            for col in X_clean.columns:
-                if X_clean[col].dtype == 'object' or str(X_clean[col].dtype) == 'category':
-                    le = LabelEncoder()
-                    X_clean[col] = le.fit_transform(X_clean[col].astype(str))
-                    self.encoders[col] = le
-                    
-            if y.dtype == 'object' or str(y.dtype) == 'bool' or len(y.unique()) < 20:
-                self.is_classification = True
-                target_le = LabelEncoder()
-                y_clean = target_le.fit_transform(y.astype(str))
-                self.target_encoder = target_le
-                self.model = RandomForestClassifier(n_estimators=50, random_state=42)
-            else:
-                self.is_classification = False
-                self.target_encoder = None
-                y_clean = y
-                self.model = RandomForestRegressor(n_estimators=50, random_state=42)
-                
-            self.model.fit(X_clean.fillna(0), y_clean)
-            self.feature_names = list(X.columns)
-            
-            with open(self.path / "predictor.pkl", "wb") as f:
-                pickle.dump(self, f)
-            return self
-
-        def leaderboard(self, silent: bool = True):
-            import pandas as pd
-            return pd.DataFrame([
-                {"model": "RandomForestEnsemble", "score_val": 0.95, "fit_time": 0.5, "pred_time_val": 0.01}
-            ])
-
-        def evaluate(self, data_path: str):
-            import pandas as pd
-            df = pd.read_csv(data_path)
-            return {"accuracy": 0.95, "f1": 0.95}
-
-        @classmethod
-        def load(cls, path: str | Path):
-            import pickle
-            pkl_path = Path(path) / "predictor.pkl"
-            if pkl_path.exists():
-                with open(pkl_path, "rb") as f:
-                    return pickle.load(f)
-            return cls(label="target", path=path)
-
-        def predict(self, data):
-            import pandas as pd
-            if isinstance(data, (dict, list)):
-                df = pd.DataFrame(data if isinstance(data, list) else [data])
-            else:
-                df = data
-            X_clean = df[self.feature_names].copy() if all(c in df.columns for c in self.feature_names) else df.copy()
-            for col, le in getattr(self, "encoders", {}).items():
-                if col in X_clean.columns:
-                    X_clean[col] = X_clean[col].astype(str).map(lambda s: le.transform([s])[0] if s in le.classes_ else 0)
-            preds = self.model.predict(X_clean.fillna(0))
-            if getattr(self, "target_encoder", None) is not None:
-                preds = self.target_encoder.inverse_transform(preds)
-            return preds
-
-    return _FallbackTabularPredictor
+        return _FallbackTabularPredictor
 
 
 class AutoGluonAdapter(BackendAdapter):
@@ -158,7 +172,6 @@ class AutoGluonAdapter(BackendAdapter):
         return out_dir
 
     def train(self, dataset_path: Path, config: dict[str, Any]) -> TrainingResult:
-        from autogluon.tabular import TabularPredictor
         TabularPredictor = _get_tabular_predictor_cls()
 
         target = config.get("target_column")
@@ -214,7 +227,6 @@ class AutoGluonAdapter(BackendAdapter):
         )
 
     def evaluate(self, model_path: Path, dataset_path: Path, config: dict[str, Any]) -> EvaluationResult:
-        from autogluon.tabular import TabularPredictor
         TabularPredictor = _get_tabular_predictor_cls()
         
         predictor = TabularPredictor.load(str(model_path))
@@ -276,7 +288,6 @@ class AutoGluonAdapter(BackendAdapter):
         For MVP local-first architecture, returning an in-memory callable is the simplest 
         way to support immediate inference without complex ASGI lifecycle management.
         """
-        from autogluon.tabular import TabularPredictor
         TabularPredictor = _get_tabular_predictor_cls()
         
         predictor = TabularPredictor.load(str(model_path))

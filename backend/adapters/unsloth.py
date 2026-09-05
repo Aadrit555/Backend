@@ -15,8 +15,7 @@ from backend.adapters.base import (
     ResourceEstimate,
     TrainingResult,
 )
-
-    # Python 3.14 compatibility monkeypatch for HuggingFace datasets dill pickler
+# Python 3.14 compatibility monkeypatch for HuggingFace datasets dill pickler
 try:
     import dill
     import datasets.utils._dill
