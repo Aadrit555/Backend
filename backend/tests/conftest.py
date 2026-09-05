@@ -17,6 +17,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.db import Base
+from backend.db import Base, init_db
+
+
+@pytest.fixture(autouse=True)
+def auto_init_db() -> None:
+    """Ensure database tables exist for all test runs."""
+    init_db()
 
 
 @pytest.fixture

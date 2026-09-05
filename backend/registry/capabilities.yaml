@@ -20,9 +20,11 @@ models:
     modalities: [text]
     tasks: [fine_tuning, text_generation]
     training_methods: [qlora]
+    training_methods: [qlora, lora]
     backends: [unsloth]
     vram_estimates:
       qlora: { min_mb: 4000, recommended_mb: 4500 }
+      lora:  { min_mb: 4000, recommended_mb: 4500 }
     license: llama-3.2-community
     description: >
       LLaMA 3.2 3B Instruct (4-bit) — VRAM-diagnosed baseline. 
@@ -32,9 +34,11 @@ models:
     modalities: [text]
     tasks: [fine_tuning, text_generation]
     training_methods: [qlora]
+    training_methods: [qlora, lora]
     backends: [unsloth]
     vram_estimates:
       qlora: { min_mb: 3000, recommended_mb: 3500 }
+      lora:  { min_mb: 3000, recommended_mb: 3500 }
     license: apache-2.0
     description: >
       Qwen 2.5 3B Instruct (4-bit) — VRAM-diagnosed candidate.
@@ -44,9 +48,11 @@ models:
     modalities: [text]
     tasks: [fine_tuning, text_generation]
     training_methods: [qlora]
+    training_methods: [qlora, lora]
     backends: [unsloth]
     vram_estimates:
       qlora: { min_mb: 3500, recommended_mb: 4000 }
+      lora:  { min_mb: 3500, recommended_mb: 4000 }
     license: llama-3.2-community
     description: >
       LLaMA 3.2 1B Instruct (4-bit) — VRAM-diagnosed candidate.
@@ -113,12 +119,15 @@ models:
     modalities: [tabular]
     tasks: [classification, regression, ranking]
     training_methods: [autogluon]
+    training_methods: [autogluon, ensemble]
     backends: [autogluon]
     vram_estimates:
       # AutoGluon is primarily CPU. min_mb: 0 means no GPU required.
       autogluon: { min_mb: 0, recommended_mb: 0 }
+      ensemble:  { min_mb: 0, recommended_mb: 0 }
     ram_estimates:
       autogluon: { min_mb: 512, recommended_mb: 4096 }
+      ensemble:  { min_mb: 512, recommended_mb: 4096 }
     license: apache-2.0
     description: >
       AutoGluon-style ensemble of XGBoost, LightGBM, CatBoost, and

@@ -65,6 +65,8 @@ def evaluate_model(
     # Compute confusion_matrix and other metrics explicitly if it's classification
     try:
         from autogluon.tabular import TabularPredictor
+        from backend.adapters.autogluon import _get_tabular_predictor_cls
+        TabularPredictor = _get_tabular_predictor_cls()
         import pandas as pd
         from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, accuracy_score
         
@@ -136,6 +138,8 @@ def analyze_errors(db: Session, evaluation_id: str) -> dict[str, Any]:
         return {"error": "unsupported_backend"}
         
     from autogluon.tabular import TabularPredictor
+    from backend.adapters.autogluon import _get_tabular_predictor_cls
+    TabularPredictor = _get_tabular_predictor_cls()
     run_dir = settings.experiments_dir / exp.id
     artifact_path = run_dir / "export"
     

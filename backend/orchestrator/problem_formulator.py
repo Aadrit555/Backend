@@ -42,8 +42,11 @@ def formulate_problem(goal: str, understanding_report: dict[str, Any]) -> Proble
         {"role": "user", "content": user_prompt},
     ]
     
-    response = chat(messages, tools=[], max_tokens=1000)
-    content = response.get("content", "{}")
+    try:
+        response = chat(messages, tools=[], max_tokens=1000)
+        content = response.get("content", "{}")
+    except Exception:
+        content = "{}"
     
     try:
         # Sometimes LLMs wrap in ```json ... ```
@@ -69,8 +72,8 @@ def formulate_problem(goal: str, understanding_report: dict[str, Any]) -> Proble
     goal_lower = goal.lower()
     report_str = json.dumps(understanding_report).lower()
     
-    # Heuristic 1: PDFs + Q&A -> RAG
-    if "pdf" in report_str and any(w in goal_lower for w in ["answer", "question", "q&a", "search"]):
+    # Heuristic 1: Documents (PDF/TXT/DOCX/HTML) + Q&A / RAG -> RAG
+    if ("rag" in goal_lower or any(w in goal_lower for w in ["answer", "question", "q&a", "search", "retrieve", "docs", "document"])) and any(ext in report_str for ext in ["pdf", "txt", "docx", "doc", "html"]):
         spec["needs_training"] = False
         spec["task_type"] = "rag"
         spec["modality"] = "text"
@@ -87,13 +90,14 @@ def formulate_problem(goal: str, understanding_report: dict[str, Any]) -> Proble
         spec["modality"] = "tabular"
         spec["needs_training"] = True
         if spec.get("task_type") not in ["classification", "regression", "ranking"]:
-            spec["task_type"] = "classification" # safe default
+            spec["task_type"] = "classification"  # safe default
             
-        # Target column override if it exists in the report and the LLM missed it
-        if "likely_target_column" in report_str:
-            pass
-            # Trust the LLM extraction of target_column if it's tabular, 
-            # but we could enforce the understanding report's best guess if needed.
+        # Target column inference from data understanding report
+        if not spec.get("target_column"):
+            for src in understanding_report.get("sources", []):
+                if src.get("likely_target_column"):
+                    spec["target_column"] = src["likely_target_column"]
+                    break
 
     # Heuristic 4: Images / Vision -> Object Detection
     if file_counts.get("image", 0) > 0 or any(w in goal_lower for w in ["detect", "vision", "image", "photo", "segment", "yolo"]):

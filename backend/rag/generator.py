@@ -46,6 +46,8 @@ def generate_answer(query: str, retrieved_chunks: list[dict[str, Any]]) -> dict[
     system_prompt = (
         "You are an expert, helpful AI assistant analyzing a provided document.\n"
         "Your task is to answer the user's question accurately, directly, and comprehensively based on the context:\n"
+        "Your task is to answer the user's question accurately, directly, and comprehensively based solely on the provided context:\n"
+        "- If the provided context does not contain the information needed to answer the question, explicitly state: 'I don't know based on the provided context.' or that the information is not provided.\n"
         "- If asked where someone studies, their university, or education: state their university (e.g. SRM University AP), degree, and coursework clearly.\n"
         "- If asked about projects: list their projects and key technical implementations with concise bullet points.\n"
         "- If asked about skills, experience, or background: summarize the relevant details directly.\n"

@@ -139,8 +139,16 @@ def test_rag_e2e(tmp_path: Path) -> None:
         
         lower_ans = adv_answer['answer'].lower()
         assert "i don't know" in lower_ans or "not in the provided context" in lower_ans or "not provided" in lower_ans or "cannot answer" in lower_ans, "Model hallucinated instead of declining!"
+        refusal_phrases = [
+            "i don't know", "not in the provided context", "not provided",
+            "cannot answer", "no mention", "not mentioned", "does not contain",
+            "not contain", "does not mention", "no information", "unavailable",
+            "unknown", "not state", "not stated", "cannot find"
+        ]
+        assert any(phrase in lower_ans for phrase in refusal_phrases), f"Model hallucinated instead of declining: {adv_answer['answer']}"
         
         print("\\n=== RAG E2E TEST PASSED ===")
+        print("\n=== RAG E2E TEST PASSED ===")
         
     finally:
         db.close()

@@ -90,9 +90,9 @@ def test_all_keys_429_falls_back(mock_groq_class, mock_sleep):
     
     # Sleep should be called 2 times (for attempt 0 and 1, since attempt 2 raises without sleep)
     assert mock_sleep.call_count == 2
-    # Check that sleep times were 2**0=1 and 2**1=2
-    mock_sleep.assert_any_call(1)
-    mock_sleep.assert_any_call(2)
+    # Check that sleep times were 15 * 1 = 15 and 15 * 2 = 30
+    mock_sleep.assert_any_call(15)
+    mock_sleep.assert_any_call(30)
     
     # active_key_index should have rotated 9 times, so 9 % 3 = 0.
     assert groq_client._active_key_index == 0

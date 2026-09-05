@@ -16,7 +16,7 @@ from backend.adapters.base import (
     TrainingResult,
 )
 
-# Python 3.14 compatibility monkeypatch for HuggingFace datasets dill pickler
+    # Python 3.14 compatibility monkeypatch for HuggingFace datasets dill pickler
 try:
     import dill
     import datasets.utils._dill
@@ -38,6 +38,7 @@ class UnslothAdapter(BackendAdapter):
         return {
             "supported_tasks": ["fine_tuning", "text_generation", "dpo"],
             "supported_models": [
+                "unsloth_llama3.2_3b", "unsloth_llama3.2_1b", "unsloth_qwen2.5_3b",
                 "unsloth/Llama-3.2-1B-Instruct-bnb-4bit", "unsloth/Llama-3.2-3B-Instruct-bnb-4bit",
                 "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit", "unsloth/Meta-Llama-3.1-70B-Instruct-bnb-4bit",
                 "unsloth/Qwen2.5-0.5B-Instruct-bnb-4bit", "unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit",

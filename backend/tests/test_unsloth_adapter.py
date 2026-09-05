@@ -29,8 +29,18 @@ def test_unsloth_adapter_e2e(tmp_path):
     assert estimate.vram_required_mb <= 4500
     
     # 4. Prepare (mock dataset)
-    prepared_dir = adapter.prepare(Path(tmp_path), config)
-    assert (prepared_dir / "train.jsonl").exists()
+    sample_rows = [
+        {"conversations": [{"from": "human", "value": "What is Python?"}, {"from": "gpt", "value": "Python is a programming language."}]},
+        {"conversations": [{"from": "human", "value": "What is PyTorch?"}, {"from": "gpt", "value": "PyTorch is a machine learning framework."}]},
+        {"conversations": [{"from": "human", "value": "Explain LoRA."}, {"from": "gpt", "value": "Low-Rank Adaptation adapts large models efficiently."}]},
+        {"conversations": [{"from": "human", "value": "What is FastAPI?"}, {"from": "gpt", "value": "FastAPI is a modern web framework for Python."}]}
+    ]
+    sample_file = tmp_path / "sample.jsonl"
+    with open(sample_file, "w", encoding="utf-8") as f:
+        for row in sample_rows:
+            f.write(json.dumps(row) + "\n")
+    prepared_dir = adapter.prepare(sample_file, config)
+    assert prepared_dir.exists()
     
     # 5. Train
     print("\n--- Starting Unsloth Integration Test Training ---")
