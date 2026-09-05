@@ -12,12 +12,19 @@ def test_unsloth_adapter_e2e(tmp_path):
     """
     adapter = UnslothAdapter()
     
+    import gc
+    import torch
+    if torch.cuda.is_available():
+        gc.collect()
+        torch.cuda.empty_cache()
+
     # 1. Capabilities
     caps = adapter.capabilities()
     assert "unsloth_llama3.2_3b" in caps["supported_models"]
     
     # 2. Config 
     config = {
+        "model_name": "unsloth/Llama-3.2-1B-Instruct-bnb-4bit",
         "max_seq_length": 512, # safe default for test
         "per_device_train_batch_size": 1,
         "prepared_dir": str(tmp_path / "prepared")
@@ -43,6 +50,9 @@ def test_unsloth_adapter_e2e(tmp_path):
     assert prepared_dir.exists()
     
     # 5. Train
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA GPU required for Unsloth training execution.")
+
     print("\n--- Starting Unsloth Integration Test Training ---")
     train_result = adapter.train(prepared_dir, config)
     print("--- Training Completed ---")

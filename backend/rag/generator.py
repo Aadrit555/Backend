@@ -1,9 +1,16 @@
+from __future__ import annotations
+
+from typing import Any
+import torch
+
 _rag_llm = None
 _rag_tokenizer = None
 
 def get_rag_llm():
     """Load local Llama-3.2-1B model on GPU for genuine RAG generation."""
     global _rag_llm, _rag_tokenizer
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA GPU is not available for Unsloth LLM.")
     if _rag_llm is None:
         print("[RAG] Initializing local Llama-3.2-1B on GPU for real-time generative RAG...")
         from unsloth import FastLanguageModel
@@ -71,10 +78,37 @@ def generate_answer(query: str, retrieved_chunks: list[dict[str, Any]]) -> dict[
         print(f"[RAG] Local LLM error: {e}")
         
     if not answer:
-        top_chunk = retrieved_chunks[0]
-        src = top_chunk.get("metadata", {}).get("source", "document")
-        answer = f"**[Source: {src}]**\n\n" + top_chunk["text"].strip()
+        try:
+            from backend.orchestrator.groq_client import _get_active_client
+            client = _get_active_client()
+            chat_resp = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                temperature=0.1,
+                max_tokens=256,
+            )
+            answer = chat_resp.choices[0].message.content
+        except Exception as e:
+            print(f"[RAG] Groq fallback error: {e}")
+
+    if not answer:
+        import re
+        stop_words = {
+            "what", "is", "the", "for", "a", "an", "in", "of", "to", "how",
+            "many", "do", "does", "get", "about", "and", "or", "on", "at",
+            "by", "from", "with", "this", "that", "these", "those", "are", "were"
+        }
+        query_tokens = set(re.findall(r"\b[a-z0-9]+\b", query.lower())) - stop_words
+        context_tokens = set(re.findall(r"\b[a-z0-9]+\b", context_text.lower()))
+        overlap = query_tokens & context_tokens
         
+        if not overlap:
+            answer = "I don't know based on the provided context."
+        else:
+            top_chunk = retrieved_chunks[0]
+            src = top_chunk.get("metadata", {}).get("source", "document")
+            answer = f"**[Source: {src}]**\n\n" + top_chunk["text"].strip()
+
     return {
         "answer": answer,
         "citations": retrieved_chunks

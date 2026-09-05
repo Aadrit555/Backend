@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { UploadCloud, CheckCircle2, DownloadCloud, Play, Sparkles, Search, X, Image as ImageIcon, Sliders } from "lucide-react";
+import { UploadCloud, CheckCircle2, DownloadCloud, Play, Sparkles, Search, X, Image as ImageIcon, Sliders, ArrowRight } from "lucide-react";
 import CustomVisionStudio from "../components/CustomVisionStudio";
 
 export default function BeginnerPage() {
@@ -621,7 +621,7 @@ export default function BeginnerPage() {
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <span className="material-symbols-outlined text-4xl text-[#595959] group-hover:text-[#00E5FF] transition-colors" data-icon="cloud_upload">cloud_upload</span>
+                <UploadCloud size={38} className="text-[#595959] group-hover:text-[#00E5FF] transition-colors" />
                 <div className="text-center flex flex-col gap-1">
                   <span className="text-body-md font-body-md text-on-background">
                     {isUploading ? "Uploading..." : "Drop your dataset here"}
@@ -681,7 +681,7 @@ export default function BeginnerPage() {
             onClick={handleBuild}
             disabled={!manifest || isBuilding}
           >
-            {isBuilding ? "BUILDING..." : "BUILD MODEL"} <span className="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+            {isBuilding ? "BUILDING..." : "BUILD MODEL"} <ArrowRight size={16} />
           </button>
         </div>
 

@@ -57,6 +57,7 @@ export default function CustomVisionStudio() {
   const previewVideoRef = useRef(null);
   const previewStreamRef = useRef(null);
   const previewLoopRef = useRef(null);
+  const runInferenceRef = useRef(null);
   const [testFilePreview, setTestFilePreview] = useState(null);
   const [predictions, setPredictions] = useState([]);
   const [topPrediction, setTopPrediction] = useState(null);
@@ -68,29 +69,47 @@ export default function CustomVisionStudio() {
 
   const activeTestingModelId = trainedModel ? trainedModel.model_id : selectedModelId;
   const activeModelIdRef = useRef(activeTestingModelId);
-  activeModelIdRef.current = activeTestingModelId;
-
   const isPreviewActiveRef = useRef(previewActive);
-  isPreviewActiveRef.current = previewActive;
+
+  useEffect(() => {
+    activeModelIdRef.current = activeTestingModelId;
+  }, [activeTestingModelId]);
+
+  useEffect(() => {
+    isPreviewActiveRef.current = previewActive;
+  }, [previewActive]);
 
   // Active class object
   const currentClass = classes.find((c) => c.id === activeClassId) || classes[0];
 
   // Fetch past models on mount
-  const fetchModels = async () => {
+  const fetchModels = useCallback(async () => {
     try {
       const res = await fetch("http://localhost:8000/api/classifier/models");
       if (res.ok) {
         const data = await res.json();
-        setPastModels(data.models || []);
+        if (data?.models) {
+          setPastModels(data.models);
+        }
       }
     } catch {
-      // Ignore network errors on init
+      // ignore
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchModels();
+    let mounted = true;
+    fetch("http://localhost:8000/api/classifier/models")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (mounted && data?.models) {
+          setPastModels(data.models);
+        }
+      })
+      .catch(() => { });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // -------------------------------------------------------------------------
@@ -111,7 +130,7 @@ export default function CustomVisionStudio() {
     }
   };
 
-  const stopCaptureCamera = () => {
+  const stopCaptureCamera = useCallback(() => {
     if (burstIntervalRef.current) {
       clearInterval(burstIntervalRef.current);
       burstIntervalRef.current = null;
@@ -122,7 +141,19 @@ export default function CustomVisionStudio() {
       captureStreamRef.current = null;
     }
     setIsCaptureCamOpen(false);
-  };
+  }, []);
+
+  const stopPreviewWebcam = useCallback(() => {
+    if (previewLoopRef.current) {
+      cancelAnimationFrame(previewLoopRef.current);
+      previewLoopRef.current = null;
+    }
+    if (previewStreamRef.current) {
+      previewStreamRef.current.getTracks().forEach((t) => t.stop());
+      previewStreamRef.current = null;
+    }
+    setPreviewActive(false);
+  }, []);
 
   useEffect(() => {
     if (isCaptureCamOpen && captureVideoRef.current && captureStreamRef.current) {
@@ -136,7 +167,7 @@ export default function CustomVisionStudio() {
       stopCaptureCamera();
       stopPreviewWebcam();
     };
-  }, []);
+  }, [stopCaptureCamera, stopPreviewWebcam]);
 
   // Frame Capture Utility
   const captureFrame = (videoEl) => {
@@ -339,17 +370,7 @@ export default function CustomVisionStudio() {
     }
   };
 
-  const stopPreviewWebcam = () => {
-    if (previewLoopRef.current) {
-      cancelAnimationFrame(previewLoopRef.current);
-      previewLoopRef.current = null;
-    }
-    if (previewStreamRef.current) {
-      previewStreamRef.current.getTracks().forEach((t) => t.stop());
-      previewStreamRef.current = null;
-    }
-    setPreviewActive(false);
-  };
+
 
   const runInferenceIteration = useCallback(async () => {
     const currentModelId = activeModelIdRef.current;
@@ -378,12 +399,16 @@ export default function CustomVisionStudio() {
       }
     }
 
-    if (isPreviewActiveRef.current && activeModelIdRef.current) {
+    if (isPreviewActiveRef.current && activeModelIdRef.current && runInferenceRef.current) {
       setTimeout(() => {
-        previewLoopRef.current = requestAnimationFrame(runInferenceIteration);
+        previewLoopRef.current = requestAnimationFrame(runInferenceRef.current);
       }, 100);
     }
   }, []);
+
+  useEffect(() => {
+    runInferenceRef.current = runInferenceIteration;
+  }, [runInferenceIteration]);
 
   useEffect(() => {
     if (previewActive && previewMode === "webcam" && activeModelIdRef.current) {
@@ -404,7 +429,7 @@ export default function CustomVisionStudio() {
         cancelAnimationFrame(previewLoopRef.current);
       }
     };
-  }, [previewActive, previewMode]);
+  }, [previewActive, previewMode, runInferenceIteration]);
 
   // File test prediction
   const handleTestFileUpload = async (e) => {
@@ -489,26 +514,23 @@ export default function CustomVisionStudio() {
                   key={cls.id}
                   type="button"
                   onClick={() => setActiveClassId(cls.id)}
-                  className={`px-3 py-1.5 text-xs font-mono transition-all flex items-center gap-2 shrink-0 border ${
-                    isActive
-                      ? "border-[#00E5FF] bg-[#00E5FF]/10 text-white font-bold shadow-[0_0_10px_rgba(0,229,255,0.15)]"
-                      : "border-[#252525] bg-[#121212] text-[#888888] hover:border-[#444444] hover:text-white"
-                  }`}
+                  className={`px-3 py-1.5 text-xs font-mono transition-all flex items-center gap-2 shrink-0 border ${isActive
+                    ? "border-[#00E5FF] bg-[#00E5FF]/10 text-white font-bold shadow-[0_0_10px_rgba(0,229,255,0.15)]"
+                    : "border-[#252525] bg-[#121212] text-[#888888] hover:border-[#444444] hover:text-white"
+                    }`}
                 >
                   <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      hasNoSamples ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
-                    }`}
+                    className={`w-1.5 h-1.5 rounded-full ${hasNoSamples ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
+                      }`}
                   />
                   <span>
                     #{idx + 1} {cls.name}
                   </span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-xs ${
-                      hasNoSamples
-                        ? "bg-amber-950/60 text-amber-300"
-                        : "bg-[#222222] text-[#AAAAAA]"
-                    }`}
+                    className={`text-[10px] px-1.5 py-0.2 rounded-xs ${hasNoSamples
+                      ? "bg-amber-950/60 text-amber-300"
+                      : "bg-[#222222] text-[#AAAAAA]"
+                      }`}
                   >
                     {cls.samples.length}
                   </span>
@@ -541,11 +563,10 @@ export default function CustomVisionStudio() {
                     placeholder="e.g. Hand, Object, Background"
                   />
                   <span
-                    className={`text-[11px] font-mono px-2 py-0.5 ${
-                      currentClass.samples.length === 0
-                        ? "text-amber-400 bg-amber-950/30 border border-amber-800/40"
-                        : "text-emerald-400 bg-emerald-950/20 border border-emerald-800/30"
-                    }`}
+                    className={`text-[11px] font-mono px-2 py-0.5 ${currentClass.samples.length === 0
+                      ? "text-amber-400 bg-amber-950/30 border border-amber-800/40"
+                      : "text-emerald-400 bg-emerald-950/20 border border-emerald-800/30"
+                      }`}
                   >
                     {currentClass.samples.length} sample{currentClass.samples.length !== 1 ? "s" : ""}
                     {currentClass.samples.length === 0 ? " (Empty)" : " (Ready)"}
@@ -644,11 +665,10 @@ export default function CustomVisionStudio() {
                         onMouseUp={stopBurstRecording}
                         onTouchStart={startBurstRecording}
                         onTouchEnd={stopBurstRecording}
-                        className={`flex-1 text-xs font-mono font-bold py-2 px-3 uppercase tracking-wider transition-all select-none flex items-center justify-center gap-1.5 ${
-                          isRecordingBurst
-                            ? "bg-red-600 text-white scale-[0.98]"
-                            : "bg-[#00E5FF] hover:bg-[#00cbe2] text-black"
-                        }`}
+                        className={`flex-1 text-xs font-mono font-bold py-2 px-3 uppercase tracking-wider transition-all select-none flex items-center justify-center gap-1.5 ${isRecordingBurst
+                          ? "bg-red-600 text-white scale-[0.98]"
+                          : "bg-[#00E5FF] hover:bg-[#00cbe2] text-black"
+                          }`}
                       >
                         <Camera size={13} />
                         {isRecordingBurst ? "RECORDING..." : `HOLD TO RECORD FOR "${currentClass.name.toUpperCase()}"`}
@@ -666,7 +686,7 @@ export default function CustomVisionStudio() {
                   {!isCaptureCamOpen && (
                     <p className="text-[11px] font-mono text-[#666666]">
                       Click <strong>OPEN CAMERA</strong> to record snapshots directly into{" "}
-                      <span className="text-[#00E5FF]">"{currentClass.name}"</span>.
+                      <span className="text-[#00E5FF]">&quot;{currentClass.name}&quot;</span>.
                     </p>
                   )}
                 </div>
@@ -703,7 +723,7 @@ export default function CustomVisionStudio() {
                   </div>
                 ) : (
                   <div className="text-[11px] font-mono text-amber-400/80 py-2.5 px-3 border border-dashed border-amber-800/30 bg-amber-950/10 text-center">
-                    No samples for "{currentClass.name}". Open camera above to capture samples.
+                    No samples for &quot;{currentClass.name}&quot;. Open camera above to capture samples.
                   </div>
                 )}
               </div>
@@ -740,11 +760,10 @@ export default function CustomVisionStudio() {
               <button
                 type="button"
                 onClick={() => setBackbone("mobilenet_v3_small")}
-                className={`py-1.5 px-2 text-center text-xs font-mono transition-colors border ${
-                  backbone === "mobilenet_v3_small"
-                    ? "border-[#00E5FF] bg-[#00E5FF]/10 text-white font-bold"
-                    : "border-[#252525] bg-[#141414] text-[#777777] hover:border-[#3A3A3A]"
-                }`}
+                className={`py-1.5 px-2 text-center text-xs font-mono transition-colors border ${backbone === "mobilenet_v3_small"
+                  ? "border-[#00E5FF] bg-[#00E5FF]/10 text-white font-bold"
+                  : "border-[#252525] bg-[#141414] text-[#777777] hover:border-[#3A3A3A]"
+                  }`}
               >
                 MobileNetV3 (Fast)
               </button>
@@ -752,11 +771,10 @@ export default function CustomVisionStudio() {
               <button
                 type="button"
                 onClick={() => setBackbone("resnet18")}
-                className={`py-1.5 px-2 text-center text-xs font-mono transition-colors border ${
-                  backbone === "resnet18"
-                    ? "border-[#00E5FF] bg-[#00E5FF]/10 text-white font-bold"
-                    : "border-[#252525] bg-[#141414] text-[#777777] hover:border-[#3A3A3A]"
-                }`}
+                className={`py-1.5 px-2 text-center text-xs font-mono transition-colors border ${backbone === "resnet18"
+                  ? "border-[#00E5FF] bg-[#00E5FF]/10 text-white font-bold"
+                  : "border-[#252525] bg-[#141414] text-[#777777] hover:border-[#3A3A3A]"
+                  }`}
               >
                 ResNet18 (Deep)
               </button>
@@ -802,24 +820,23 @@ export default function CustomVisionStudio() {
             <button
               type="button"
               onClick={handleTrainClick}
-              className={`w-full py-2.5 px-3 font-mono text-xs uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                canTrain
-                  ? "bg-[#00E5FF] hover:bg-[#00cbe2] text-black shadow-[0_0_15px_rgba(0,229,255,0.25)]"
-                  : "bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40"
-              }`}
+              className={`w-full py-2.5 px-3 font-mono text-xs uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${canTrain
+                ? "bg-[#00E5FF] hover:bg-[#00cbe2] text-black shadow-[0_0_15px_rgba(0,229,255,0.25)]"
+                : "bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40"
+                }`}
             >
               <Play size={13} fill={canTrain ? "black" : "currentColor"} />
               {isTraining
                 ? "TRAINING PYTORCH MODEL..."
                 : canTrain
-                ? `TRAIN CLASSIFIER (${classes.length} CLASSES, ${totalSamplesCount} SAMPLES)`
-                : `SAMPLES REQUIRED (CLICK FOR INFO)`}
+                  ? `TRAIN CLASSIFIER (${classes.length} CLASSES, ${totalSamplesCount} SAMPLES)`
+                  : `SAMPLES REQUIRED (CLICK FOR INFO)`}
             </button>
 
             {/* Validation warning if empty */}
             {emptyClasses.length > 0 && !isTraining && (
               <p className="text-[10px] font-mono text-amber-400/90 text-center">
-                ⚠️ "{emptyClasses[0].name}" needs samples to enable training.
+                ⚠️ &quot;{emptyClasses[0].name}&quot; needs samples to enable training.
               </p>
             )}
 
@@ -876,11 +893,10 @@ export default function CustomVisionStudio() {
               <button
                 type="button"
                 onClick={() => setPreviewMode("webcam")}
-                className={`py-1 text-xs font-mono transition-colors text-center ${
-                  previewMode === "webcam"
-                    ? "text-[#00E5FF] border-b border-[#00E5FF] font-bold"
-                    : "text-[#777777] hover:text-white"
-                }`}
+                className={`py-1 text-xs font-mono transition-colors text-center ${previewMode === "webcam"
+                  ? "text-[#00E5FF] border-b border-[#00E5FF] font-bold"
+                  : "text-[#777777] hover:text-white"
+                  }`}
               >
                 Webcam Test
               </button>
@@ -890,11 +906,10 @@ export default function CustomVisionStudio() {
                   stopPreviewWebcam();
                   setPreviewMode("file");
                 }}
-                className={`py-1 text-xs font-mono transition-colors text-center ${
-                  previewMode === "file"
-                    ? "text-[#00E5FF] border-b border-[#00E5FF] font-bold"
-                    : "text-[#777777] hover:text-white"
-                }`}
+                className={`py-1 text-xs font-mono transition-colors text-center ${previewMode === "file"
+                  ? "text-[#00E5FF] border-b border-[#00E5FF] font-bold"
+                  : "text-[#777777] hover:text-white"
+                  }`}
               >
                 Image File Test
               </button>
@@ -924,11 +939,10 @@ export default function CustomVisionStudio() {
                         type="button"
                         onClick={startPreviewWebcam}
                         disabled={!activeTestingModelId}
-                        className={`text-xs font-mono px-3 py-1 font-bold uppercase transition-colors ${
-                          activeTestingModelId
-                            ? "bg-[#00E5FF] text-black hover:bg-[#00cbe2]"
-                            : "bg-[#1C1C1C] text-[#555555] cursor-not-allowed"
-                        }`}
+                        className={`text-xs font-mono px-3 py-1 font-bold uppercase transition-colors ${activeTestingModelId
+                          ? "bg-[#00E5FF] text-black hover:bg-[#00cbe2]"
+                          : "bg-[#1C1C1C] text-[#555555] cursor-not-allowed"
+                          }`}
                       >
                         START PREVIEW
                       </button>
@@ -970,11 +984,10 @@ export default function CustomVisionStudio() {
                 </div>
 
                 <label
-                  className={`text-xs font-mono py-1.5 border transition-colors text-center block ${
-                    activeTestingModelId
-                      ? "bg-[#181818] hover:bg-[#222222] border-[#333333] hover:border-[#00E5FF] text-white cursor-pointer"
-                      : "bg-[#141414] border-[#222222] text-[#555555] cursor-not-allowed"
-                  }`}
+                  className={`text-xs font-mono py-1.5 border transition-colors text-center block ${activeTestingModelId
+                    ? "bg-[#181818] hover:bg-[#222222] border-[#333333] hover:border-[#00E5FF] text-white cursor-pointer"
+                    : "bg-[#141414] border-[#222222] text-[#555555] cursor-not-allowed"
+                    }`}
                 >
                   CHOOSE TEST IMAGE
                   <input
@@ -1012,9 +1025,8 @@ export default function CustomVisionStudio() {
                         </div>
                         <div className="w-full h-1.5 bg-[#1A1A1A] overflow-hidden rounded-[1px]">
                           <div
-                            className={`h-full transition-all duration-150 ${
-                              isTop ? "bg-[#00E5FF]" : "bg-[#3D3D3D]"
-                            }`}
+                            className={`h-full transition-all duration-150 ${isTop ? "bg-[#00E5FF]" : "bg-[#3D3D3D]"
+                              }`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>

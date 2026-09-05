@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   Layers,
   Sparkles,
+  ArrowRight,
 } from "lucide-react";
 
 export default function DataPrepPage() {
@@ -290,9 +291,7 @@ export default function DataPrepPage() {
             >
               {isProcessing ? "PROCESSING PIPELINE..." : "RUN DATA FACTORY"}
               {!isProcessing && (
-                <span className="material-symbols-outlined text-sm" data-icon="arrow_forward">
-                  arrow_forward
-                </span>
+                <ArrowRight size={16} />
               )}
             </button>
 
