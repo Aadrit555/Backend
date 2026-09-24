@@ -80,6 +80,17 @@ def get_model_capabilities(model_id: str) -> dict[str, Any]:
     registry = load_registry()
     models = registry.get("models", {})
     if model_id not in models:
+        # Check if model_id is a Hugging Face Hub repo (e.g. "org/model-name" or unsloth model)
+        if "/" in model_id or not model_id.endswith(".pt"):
+            try:
+                from backend.hf_hub import import_hf_model
+                record = import_hf_model(model_id=model_id, pipeline_type="auto")
+                models = load_registry().get("models", {})
+                if model_id in models:
+                    return {"id": model_id, **models[model_id]}
+            except Exception as hf_err:
+                print(f"[Loader] Note: dynamic HF import failed for '{model_id}': {hf_err}")
+
         raise KeyError(
             f"Model '{model_id}' not found in capability registry. "
             f"Available: {list(models.keys())}"

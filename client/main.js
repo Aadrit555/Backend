@@ -141,7 +141,8 @@ const getBuilderFiles = setupFileDrop('builder-drop', 'builder-file', 'builder-b
 
 const archs = {
     tabular: [
-        { val: 'autogluon_best', label: 'AutoGluon Best' }
+        { val: 'autogluon_best', label: 'AutoGluon Best' },
+        { val: 'custom_hf', label: 'Import Hugging Face Model...' }
     ],
     llm: [
         { val: 'unsloth/Llama-3.2-1B-Instruct-bnb-4bit', label: 'Llama 3.2 1B Instruct (4-bit)' },
@@ -160,10 +161,11 @@ const archs = {
         { val: 'unsloth/gemma-2-9b-it-bnb-4bit', label: 'Gemma 2 9B IT (4-bit)' },
         { val: 'unsloth/gemma-2-27b-it-bnb-4bit', label: 'Gemma 2 27B IT (4-bit)' },
         { val: 'unsloth/Phi-3.5-mini-instruct-bnb-4bit', label: 'Phi 3.5 Mini Instruct (4-bit)' },
-        { val: 'custom_hf', label: 'Custom Hugging Face Model...' }
+        { val: 'custom_hf', label: 'Import Hugging Face Model...' }
     ],
     rag: [
-        { val: 'rag_default', label: 'RAG Default pipeline' }
+        { val: 'rag_default', label: 'RAG Default pipeline' },
+        { val: 'custom_hf', label: 'Import Hugging Face Model...' }
     ],
     object_detection: [
         { val: 'yolo11n', label: 'YOLO11 Nano (Next-Gen, High Accuracy & Speed)' },
@@ -171,14 +173,16 @@ const archs = {
         { val: 'yolov8n', label: 'YOLOv8 Nano (Fastest, Edge-Optimized)' },
         { val: 'yolov8s', label: 'YOLOv8 Small (Balanced)' },
         { val: 'yolov8m', label: 'YOLOv8 Medium (High Accuracy)' },
-        { val: 'yolov8l', label: 'YOLOv8 Large (Complex Detection)' }
+        { val: 'yolov8l', label: 'YOLOv8 Large (Complex Detection)' },
+        { val: 'custom_hf', label: 'Import Hugging Face Model...' }
     ],
     vision: [
         { val: 'convnext_tiny', label: 'ConvNeXt-Tiny (Modern Pure-ConvNet, Best Accuracy)' },
         { val: 'efficientnet_b0', label: 'EfficientNet-B0 (Compound Scaled, High Efficiency)' },
         { val: 'resnet50', label: 'ResNet-50 (Deep Feature Extractor)' },
         { val: 'resnet18', label: 'ResNet-18 (Fast & Balanced)' },
-        { val: 'mobilenet_v3_small', label: 'MobileNet V3 Small (Ultra-Lightweight)' }
+        { val: 'mobilenet_v3_small', label: 'MobileNet V3 Small (Ultra-Lightweight)' },
+        { val: 'custom_hf', label: 'Import Hugging Face Model...' }
     ]
 };
 
@@ -521,6 +525,17 @@ document.getElementById('builder-btn').addEventListener('click', async () => {
     const status = document.getElementById('builder-status');
     let arch = document.getElementById('builder-val').dataset.val;
 
+    if (arch === 'custom_hf') {
+        const customHfInput = document.getElementById('builder-custom-hf');
+        if (customHfInput && customHfInput.value.trim() !== '') {
+            arch = customHfInput.value.trim();
+        } else {
+            status.textContent = "Please enter or select a valid Hugging Face model ID.";
+            status.style.color = "#ff6b6b";
+            return;
+        }
+    }
+
     if (currentPipeline === 'vision') {
         const numImgs = vsClassesData.reduce((acc, c) => acc + c.images.length, 0);
         if (numImgs < 2) {
@@ -626,12 +641,12 @@ document.getElementById('builder-btn').addEventListener('click', async () => {
         return;
     }
 
-    if (arch === 'custom_hf') {
-        const customHfInput = document.getElementById('builder-custom-hf');
+    const customHfInput = document.getElementById('builder-custom-hf');
+    if (arch === 'custom_hf' || (customHfInput && !customHfInput.classList.contains('hidden') && customHfInput.value.trim() !== '')) {
         if (customHfInput && customHfInput.value.trim() !== '') {
             arch = customHfInput.value.trim();
         } else {
-            status.textContent = "Please enter a valid Hugging Face model ID.";
+            status.textContent = "Please enter or select a valid Hugging Face model ID.";
             status.style.color = "#ff6b6b";
             return;
         }
@@ -1423,10 +1438,29 @@ if (hfSearch) hfSearch.addEventListener('input', (e) => {
                         <span><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" stroke-width="2"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/></svg> ${m.likes}</span>
                     </div>
                 `;
-                item.addEventListener('click', () => {
+                item.addEventListener('click', async () => {
                     const customInput = document.getElementById('builder-custom-hf');
-                    if (customInput) customInput.value = m.id;
+                    const valEl = document.getElementById('builder-val');
+                    if (customInput) {
+                        customInput.value = m.id;
+                        customInput.classList.remove('hidden');
+                    }
+                    if (valEl) {
+                        valEl.textContent = `HF: ${m.id}`;
+                        valEl.dataset.val = m.id;
+                    }
                     closeHfModal();
+
+                    // Automatically trigger backend registration so capabilities & estimates are ready
+                    try {
+                        await fetch(`${API_BASE}/api/hf/import`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ model_id: m.id, pipeline_type: currentPipeline })
+                        });
+                    } catch (e) {
+                        console.warn("Auto HF registration note:", e);
+                    }
                 });
                 hfResults.appendChild(item);
             });

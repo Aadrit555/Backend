@@ -142,7 +142,7 @@ def import_hf_model(
             training_method = "lora"
             task = "fine_tuning"
     else:
-        if pipeline_type == "vision":
+        if pipeline_type in ["vision", "object_detection"]:
             backend = "ultralytics"
             modality = "image"
             training_method = "full"
