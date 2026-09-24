@@ -1,4 +1,3 @@
-const API_BASE = "http://localhost:8000";
 const API_BASE = window.API_BASE || (window.location.port === "8000" ? window.location.origin : "http://localhost:8000");
 
 // --- UUID & State ---
@@ -167,7 +166,7 @@ const archs = {
         { val: 'rag_default', label: 'RAG Default pipeline' },
         { val: 'custom_hf', label: 'Import Hugging Face Model...' }
     ],
-    object_detection: [
+    vision_od: [
         { val: 'yolo11n', label: 'YOLO11 Nano (Next-Gen, High Accuracy & Speed)' },
         { val: 'yolo11s', label: 'YOLO11 Small (State-of-the-Art Balanced)' },
         { val: 'yolov8n', label: 'YOLOv8 Nano (Fastest, Edge-Optimized)' },
@@ -176,7 +175,7 @@ const archs = {
         { val: 'yolov8l', label: 'YOLOv8 Large (Complex Detection)' },
         { val: 'custom_hf', label: 'Import Hugging Face Model...' }
     ],
-    vision: [
+    vision_cls: [
         { val: 'convnext_tiny', label: 'ConvNeXt-Tiny (Modern Pure-ConvNet, Best Accuracy)' },
         { val: 'efficientnet_b0', label: 'EfficientNet-B0 (Compound Scaled, High Efficiency)' },
         { val: 'resnet50', label: 'ResNet-50 (Deep Feature Extractor)' },
@@ -185,8 +184,70 @@ const archs = {
         { val: 'custom_hf', label: 'Import Hugging Face Model...' }
     ]
 };
+// Alias for vision default
+archs.vision = archs.vision_od;
 
 let currentPipeline = 'tabular';
+let currentVisionMode = 'od'; // 'od' (Object Detection) or 'cls' (Classification)
+
+function setVisionMode(mode) {
+    currentVisionMode = mode;
+    const btnOd = document.getElementById('vm-btn-od');
+    const btnCls = document.getElementById('vm-btn-cls');
+    const builderDataUi = document.getElementById('builder-data-ui');
+    const visionStudioUi = document.getElementById('vision-studio-ui');
+    const builderFmt = document.getElementById('builder-fmt');
+    const s2Title = document.getElementById('s2-title');
+    const s2Hint = document.getElementById('s2-hint');
+    const builderBtnSpan = document.querySelector('#builder-btn span');
+
+    if (mode === 'od') {
+        if (btnOd) {
+            btnOd.style.background = 'var(--panel-hover)';
+            btnOd.style.color = '#fff';
+            btnOd.style.borderColor = 'var(--line-strong)';
+        }
+        if (btnCls) {
+            btnCls.style.background = 'transparent';
+            btnCls.style.color = '#a9a7b4';
+            btnCls.style.borderColor = 'var(--line)';
+        }
+        if (builderDataUi) builderDataUi.classList.remove('hidden');
+        if (visionStudioUi) visionStudioUi.classList.add('hidden');
+        stopVsWebcam();
+
+        if (s2Title) s2Title.textContent = 'Object Detection Dataset';
+        if (s2Hint) s2Hint.textContent = 'Upload training images, video clips (.mp4, .mov), or annotated YOLO zip archives';
+        if (builderFmt) builderFmt.textContent = 'Supported formats: Images (JPG, PNG, WEBP), Videos (MP4, AVI, MOV), ZIP';
+        if (builderBtnSpan) builderBtnSpan.textContent = 'Train Object Detection Model';
+
+        updateBuilderArchMenu('vision_od');
+    } else {
+        if (btnCls) {
+            btnCls.style.background = 'var(--panel-hover)';
+            btnCls.style.color = '#fff';
+            btnCls.style.borderColor = 'var(--line-strong)';
+        }
+        if (btnOd) {
+            btnOd.style.background = 'transparent';
+            btnOd.style.color = '#a9a7b4';
+            btnOd.style.borderColor = 'var(--line)';
+        }
+        if (builderDataUi) builderDataUi.classList.add('hidden');
+        if (visionStudioUi) visionStudioUi.classList.remove('hidden');
+        startVsWebcam();
+
+        if (s2Title) s2Title.textContent = 'Webcam Burst Capture';
+        if (s2Hint) s2Hint.textContent = 'Capture live training images for your custom visual classes';
+        if (builderBtnSpan) builderBtnSpan.textContent = 'Train Classification Model';
+
+        updateBuilderArchMenu('vision_cls');
+    }
+}
+
+// Bind vision mode buttons
+document.getElementById('vm-btn-od')?.addEventListener('click', () => setVisionMode('od'));
+document.getElementById('vm-btn-cls')?.addEventListener('click', () => setVisionMode('cls'));
 
 function updateBuilderArchMenu(pipeline) {
     const menu = document.getElementById('builder-menu');
@@ -227,13 +288,13 @@ document.querySelectorAll('#builder-tabs .tab').forEach(tab => {
             if (currentPipeline === 'tabular') builderBtnSpan.textContent = 'Build Model';
             else if (currentPipeline === 'llm') builderBtnSpan.textContent = 'Fine-Tune Model';
             else if (currentPipeline === 'rag') builderBtnSpan.textContent = 'Build RAG Pipeline';
-            else if (currentPipeline === 'object_detection') builderBtnSpan.textContent = 'Train Object Detection Model';
-            else if (currentPipeline === 'vision') builderBtnSpan.textContent = 'Train Vision Model';
+            else if (currentPipeline === 'vision') builderBtnSpan.textContent = currentVisionMode === 'cls' ? 'Train Classification Model' : 'Train Object Detection Model';
         }
 
         const builderMainTitle = document.getElementById('builder-main-title');
         const builderMainSub = document.getElementById('builder-main-sub');
         const builderFmt = document.getElementById('builder-fmt');
+        const visionModeSelector = document.getElementById('vision-mode-selector');
 
         if (builderMainTitle && builderMainSub) {
             if (currentPipeline === 'tabular') {
@@ -248,14 +309,9 @@ document.querySelectorAll('#builder-tabs .tab').forEach(tab => {
                 builderMainTitle.innerHTML = 'Build your <span class="grad">RAG.</span>';
                 builderMainSub.textContent = 'Upload your documents, and let the platform handle the rest. We embed and construct the retrieval pipeline automatically.';
                 if (builderFmt) builderFmt.textContent = 'Supported formats: PDF, DOCX, TXT, MD, JSONL';
-            } else if (currentPipeline === 'object_detection') {
-                builderMainTitle.innerHTML = 'Train <span class="grad">Object Detection.</span>';
-                builderMainSub.textContent = 'Upload training images, video footage (.mp4, .mov), or annotated YOLO zip archives. Frames and annotations will be prepared automatically.';
-                if (builderFmt) builderFmt.textContent = 'Supported formats: Images (JPG, PNG, WEBP), Videos (MP4, AVI, MOV), ZIP';
             } else if (currentPipeline === 'vision') {
-                builderMainTitle.innerHTML = 'Train your <span class="grad">Vision AI.</span>';
-                builderMainSub.textContent = 'Upload your annotated image dataset, and let the platform handle the rest. We fine-tune the object detection model automatically.';
-                if (builderFmt) builderFmt.textContent = 'Supported formats: JPG, PNG, WEBP';
+                builderMainTitle.innerHTML = 'Computer Vision <span class="grad">Studio.</span>';
+                builderMainSub.textContent = 'Fine-tune Object Detection models (YOLO11, YOLOv8) with images/video or train real-time image classifiers using webcam burst capture.';
             }
         }
 
@@ -263,24 +319,17 @@ document.querySelectorAll('#builder-tabs .tab').forEach(tab => {
         const visionStudioUi = document.getElementById('vision-studio-ui');
 
         if (currentPipeline === 'vision') {
-            if (builderDataUi) builderDataUi.classList.add('hidden');
-            if (visionStudioUi) visionStudioUi.classList.remove('hidden');
-            document.getElementById('s2-title').textContent = 'Webcam Capture';
-            document.getElementById('s2-hint').textContent = 'Capture training images live';
-            startVsWebcam();
+            if (visionModeSelector) visionModeSelector.classList.remove('hidden');
+            setVisionMode(currentVisionMode);
         } else {
+            if (visionModeSelector) visionModeSelector.classList.add('hidden');
             if (builderDataUi) builderDataUi.classList.remove('hidden');
             if (visionStudioUi) visionStudioUi.classList.add('hidden');
             document.getElementById('s2-title').textContent = 'Training Data';
-            if (currentPipeline === 'object_detection') {
-                document.getElementById('s2-hint').textContent = 'Upload images, video clips, or annotated zip files';
-            } else {
-                document.getElementById('s2-hint').textContent = 'Upload your dataset to get started';
-            }
+            document.getElementById('s2-hint').textContent = 'Upload your dataset to get started';
             stopVsWebcam();
+            updateBuilderArchMenu(currentPipeline);
         }
-
-        updateBuilderArchMenu(currentPipeline);
     });
 });
 
@@ -536,7 +585,7 @@ document.getElementById('builder-btn').addEventListener('click', async () => {
         }
     }
 
-    if (currentPipeline === 'vision') {
+    if (currentPipeline === 'vision' && currentVisionMode === 'cls') {
         const numImgs = vsClassesData.reduce((acc, c) => acc + c.images.length, 0);
         if (numImgs < 2) {
             status.textContent = "Please capture some images for your classes first.";

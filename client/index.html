@@ -1154,21 +1154,13 @@
                 RAG Intelligence
             </button>
             <span class="tab-sep"></span>
-            <button class="tab" data-val="object_detection">
+            <button class="tab" data-val="vision">
                 <svg viewBox="0 0 24 24" style="stroke-width: 1.8;">
                     <rect width="18" height="18" x="3" y="3" rx="2" />
                     <path d="m9 9 3 3-3 3" />
                     <path d="m15 15-3-3 3-3" />
                 </svg>
-                Object Detection
-            </button>
-            <span class="tab-sep"></span>
-            <button class="tab" data-val="vision">
-                <svg viewBox="0 0 24 24" style="width:28px">
-                    <path d="M1.5 12S5.6 5.2 12 5.2 22.5 12 22.5 12 18.4 18.8 12 18.8 1.5 12 1.5 12z" />
-                    <circle cx="12" cy="12" r="3.2" />
-                </svg>
-                Vision Studio
+                Computer Vision Studio
             </button>
         </div>
 
@@ -1198,6 +1190,16 @@
                 <span class="num">02</span><span class="rail"></span>
                 <h2 id="s2-title">Training Data</h2>
                 <p class="hint" id="s2-hint">Upload your dataset to get started</p>
+
+                <!-- Vision Studio Mode Selector (Hidden by default, shown when Computer Vision Studio is selected) -->
+                <div id="vision-mode-selector" class="hidden" style="display: flex; gap: 10px; margin-bottom: 16px;">
+                    <button type="button" id="vm-btn-od" class="tab active" style="padding: 8px 16px; font-size: 13px; font-weight: 500; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--panel-hover); color: #fff; cursor: pointer;">
+                        🎯 Object Detection (YOLO / Images & Video)
+                    </button>
+                    <button type="button" id="vm-btn-cls" class="tab" style="padding: 8px 16px; font-size: 13px; font-weight: 500; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: #a9a7b4; cursor: pointer;">
+                        📷 Image Classification (Webcam / Backbones)
+                    </button>
+                </div>
 
                 <div id="builder-data-ui">
                     <span class="fmt" id="builder-fmt">Supported formats: CSV, XLSX, PARQUET, TXT, JSONL</span>
