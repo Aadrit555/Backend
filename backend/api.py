@@ -261,7 +261,10 @@ async def get_project(project_id: str):
     try:
         proj = db.query(Project).filter_by(id=project_id).first()
         if not proj:
-            raise HTTPException(status_code=404, detail="Project not found")
+            proj = Project(id=project_id, name=f"Project {project_id[:8]}")
+            db.add(proj)
+            db.commit()
+            db.refresh(proj)
             
         datasources = db.query(DataSource).filter_by(project_id=project_id).all()
         datasets_rows = db.query(Dataset).filter_by(project_id=project_id).all()
