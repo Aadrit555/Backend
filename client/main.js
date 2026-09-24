@@ -772,10 +772,12 @@ document.getElementById('builder-btn').addEventListener('click', async () => {
 
         if (!res.ok) throw new Error("Build job failed to start");
 
+        const buildData = await res.json();
+
         status.textContent = "Build triggered! Streaming logs...";
         status.style.color = "#e9e7f2";
 
-        startTerminalPolling(currentPipeline, prevLatestId);
+        startTerminalPolling(currentPipeline, buildData.experiment_id, prevLatestId);
 
     } catch (e) {
         console.error(e);
@@ -784,7 +786,7 @@ document.getElementById('builder-btn').addEventListener('click', async () => {
     }
 });
 
-async function startTerminalPolling(pipeline, prevLatestId) {
+async function startTerminalPolling(pipeline, directExpId, prevLatestId) {
     const term = document.getElementById('builder-terminal');
     const logs = document.getElementById('term-logs');
     const progBar = document.getElementById('term-progress');
@@ -803,10 +805,16 @@ async function startTerminalPolling(pipeline, prevLatestId) {
     progBar.style.width = '0%';
     progText.textContent = '0%';
 
+    // If experiment_id was returned directly from the build API, start streaming immediately!
+    if (directExpId) {
+        streamLogs(directExpId, pipeline);
+        return;
+    }
+
     let activeExpId = null;
     let pollAttempts = 0;
 
-    // 1. Poll projects to find the new experiment
+    // 1. Fallback: Poll projects to find the new experiment
     const findExp = setInterval(async () => {
         pollAttempts++;
         try {

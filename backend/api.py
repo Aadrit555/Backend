@@ -27,102 +27,105 @@ class ExpertBuildRequest(BaseModel):
     pipeline_type: str
     expert_config: dict[str, Any] | None = None
 
-def _run_expert_pipeline(project_id: str, pipeline_type: str, expert_config: dict[str, Any]):
-    """Background task to directly create and trigger an expert mode training run."""
-    def _write_failure(err_msg: str):
-        try:
-            db = SessionLocal()
-            from backend.db import Experiment
-            exp = Experiment(project_id=project_id, dataset_id="", model_name="error", backend="error", status="failed", config_json=json.dumps({"error": err_msg}))
-            db.add(exp)
-            db.commit()
-            db.close()
-        except Exception as write_err:
-            print(f"Failed to write error to DB: {write_err}")
-
-    try:
-        if pipeline_type == "rag":
-            backend = "rag"
-            model_name = "rag_default"
-            training_method = "faiss_index"
-        elif pipeline_type == "tabular":
+def _create_and_start_expert_pipeline(project_id: str, pipeline_type: str, expert_config: dict[str, Any]) -> str:
+    """Synchronously creates the experiment in DB and launches the training process."""
+    if pipeline_type == "rag":
+        backend = "rag"
+        model_name = "rag_default"
+        training_method = "faiss_index"
+    elif pipeline_type == "tabular":
+        backend = "autogluon"
+        model_name = "autogluon_tabular"
+        training_method = "ensemble"
+    elif pipeline_type == "llm":
+        candidates = expert_config.get("model_candidates", [])
+        model_name = candidates[0] if candidates else "unsloth/Llama-3.2-1B-Instruct-bnb-4bit"
+        from backend.registry.loader import get_model_info
+        info = get_model_info(model_name)
+        backend = info.get("backends", ["unsloth"])[0] if info else "unsloth"
+        training_method = info.get("training_methods", ["lora"])[0] if info else "lora"
+    elif pipeline_type in ["vision", "object_detection"]:
+        candidates = expert_config.get("model_candidates", [])
+        model_name = candidates[0] if candidates else "yolov8n"
+        from backend.registry.loader import get_model_info
+        info = get_model_info(model_name)
+        if info and "ultralytics" in info.get("backends", []):
+            backend = "ultralytics"
+            training_method = info.get("training_methods", ["full"])[0]
+        elif info and "autotrain" in info.get("backends", []):
+            backend = "autotrain"
+            training_method = "full"
+        else:
+            backend = "ultralytics" if "yolo" in model_name.lower() or pipeline_type == "object_detection" else "autotrain"
+            training_method = "full"
+    else:
+        candidates = expert_config.get("model_candidates", [])
+        model_name = candidates[0] if candidates else ""
+        from backend.registry.loader import get_model_info
+        info = get_model_info(model_name)
+        if info and info.get("backends"):
+            backend = info["backends"][0]
+            training_method = info.get("training_methods", ["full"])[0]
+        else:
             backend = "autogluon"
             model_name = "autogluon_tabular"
             training_method = "ensemble"
-        elif pipeline_type == "llm":
-            candidates = expert_config.get("model_candidates", [])
-            model_name = candidates[0] if candidates else "unsloth_llama3.2_1b"
-            from backend.registry.loader import get_model_info
-            info = get_model_info(model_name)
-            backend = info.get("backends", ["unsloth"])[0] if info else "unsloth"
-            training_method = info.get("training_methods", ["lora"])[0] if info else "lora"
-        elif pipeline_type in ["vision", "object_detection"]:
-            candidates = expert_config.get("model_candidates", [])
-            model_name = candidates[0] if candidates else "yolov8n"
-            from backend.registry.loader import get_model_info
-            info = get_model_info(model_name)
-            if info and "ultralytics" in info.get("backends", []):
-                backend = "ultralytics"
-                training_method = info.get("training_methods", ["full"])[0]
-            elif info and "autotrain" in info.get("backends", []):
-                backend = "autotrain"
-                training_method = "full"
-            else:
-                backend = "ultralytics" if "yolo" in model_name.lower() or pipeline_type == "object_detection" else "autotrain"
-                training_method = "full"
-        else:
-            candidates = expert_config.get("model_candidates", [])
-            model_name = candidates[0] if candidates else ""
-            from backend.registry.loader import get_model_info
-            info = get_model_info(model_name)
-            if info and info.get("backends"):
-                backend = info["backends"][0]
-                training_method = info.get("training_methods", ["full"])[0]
-            else:
-                _write_failure(f"Unknown pipeline type: {pipeline_type}")
-                return
-            
-        config_json = json.dumps({"training_method": training_method, **expert_config})
-            
-        db = SessionLocal()
-        from backend.db import Experiment, TrainingRun
-        exp = Experiment(
-            project_id=project_id,
-            dataset_id=project_id,
-            model_name=model_name,
-            backend=backend,
-            config_json=config_json
-        )
-        db.add(exp)
-        db.commit()
-        db.refresh(exp)
         
-        run = TrainingRun(
-            experiment_id=exp.id,
-            backend=backend,
-            config_json=config_json
-        )
-        db.add(run)
-        db.commit()
-        exp_id = exp.id
-        db.close()
+    config_json = json.dumps({"training_method": training_method, **expert_config})
         
-        # Launch in a separate process to avoid PyTorch CUDA thread deadlocks
-        import subprocess
-        import sys
-        subprocess.Popen([sys.executable, "-m", "backend.run_training", exp_id])
-        
-    except Exception as e:
-        print(f"Expert Pipeline error: {e}")
-        import traceback
-        traceback.print_exc()
-        _write_failure(str(e))
+    db = SessionLocal()
+    from backend.db import Experiment, TrainingRun
+    exp = Experiment(
+        project_id=project_id,
+        dataset_id=project_id,
+        model_name=model_name,
+        backend=backend,
+        status="training",
+        config_json=config_json
+    )
+    db.add(exp)
+    db.commit()
+    db.refresh(exp)
+    
+    run = TrainingRun(
+        experiment_id=exp.id,
+        backend=backend,
+        status="training",
+        config_json=config_json
+    )
+    db.add(run)
+    db.commit()
+    exp_id = exp.id
+    db.close()
+
+    # Pre-populate status.json so polling immediately sees active status
+    status_dir = settings.experiments_dir / exp_id
+    status_dir.mkdir(parents=True, exist_ok=True)
+    status_file = status_dir / "status.json"
+    init_entry = [{
+        "stage": "init",
+        "pct": 5,
+        "message": f"Initializing {pipeline_type} pipeline ({model_name})...",
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }]
+    status_file.write_text(json.dumps(init_entry))
+    
+    # Launch in a separate process with stdout/stderr directed to process.log
+    import subprocess
+    import sys
+    log_fp = (status_dir / "process.log").open("w", encoding="utf-8")
+    subprocess.Popen(
+        [sys.executable, "-m", "backend.run_training", exp_id],
+        stdout=log_fp,
+        stderr=subprocess.STDOUT
+    )
+    return exp_id
 
 @router.post("/api/expert_build")
-async def api_expert_build(req: ExpertBuildRequest, background_tasks: BackgroundTasks):
-    """Trigger the direct execution pipeline for Expert Mode."""
-    background_tasks.add_task(_run_expert_pipeline, req.project_id, req.pipeline_type, req.expert_config or {})
-    return {"status": "started", "project_id": req.project_id}
+async def api_expert_build(req: ExpertBuildRequest):
+    """Trigger the direct execution pipeline for Expert Mode and immediately return experiment_id."""
+    exp_id = _create_and_start_expert_pipeline(req.project_id, req.pipeline_type, req.expert_config or {})
+    return {"status": "started", "project_id": req.project_id, "experiment_id": exp_id}
 
 def _run_pipeline(project_id: str, goal: str, expert_config: dict[str, Any] | None):
     """Background task to run the orchestrator and trigger training."""
