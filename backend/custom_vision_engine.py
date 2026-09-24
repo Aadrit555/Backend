@@ -87,24 +87,71 @@ def build_classifier_model(num_classes: int, backbone_name: str = "mobilenet_v3_
     """Instantiate a pretrained backbone with an adapted classification head."""
     backbone_name = backbone_name.lower().strip()
 
-    if "resnet" in backbone_name:
-        model = tv_models.resnet18(weights=tv_models.ResNet18_Weights.DEFAULT)
-        # Freeze feature extraction layers for ultra-fast transfer learning
+    if "convnext" in backbone_name:
+        try:
+            model = tv_models.convnext_tiny(weights=tv_models.ConvNeXt_Tiny_Weights.DEFAULT)
+        except Exception as e:
+            print(f"[Custom Vision Engine] Warning: Could not download ConvNeXt-Tiny weights ({e}), initializing unweighted.")
+            model = tv_models.convnext_tiny(weights=None)
         for param in model.parameters():
             param.requires_grad = False
+        in_features = model.classifier[2].in_features
+        model.classifier[2] = nn.Sequential(
+            nn.Dropout(p=0.2),
+            nn.Linear(in_features, num_classes),
+        )
 
+    elif "efficientnet" in backbone_name:
+        try:
+            model = tv_models.efficientnet_b0(weights=tv_models.EfficientNet_B0_Weights.DEFAULT)
+        except Exception as e:
+            print(f"[Custom Vision Engine] Warning: Could not download EfficientNet-B0 weights ({e}), initializing unweighted.")
+            model = tv_models.efficientnet_b0(weights=None)
+        for param in model.parameters():
+            param.requires_grad = False
+        in_features = model.classifier[1].in_features
+        model.classifier[1] = nn.Sequential(
+            nn.Dropout(p=0.2),
+            nn.Linear(in_features, num_classes),
+        )
+
+    elif "resnet50" in backbone_name:
+        try:
+            model = tv_models.resnet50(weights=tv_models.ResNet50_Weights.DEFAULT)
+        except Exception as e:
+            print(f"[Custom Vision Engine] Warning: Could not download ResNet-50 weights ({e}), initializing unweighted.")
+            model = tv_models.resnet50(weights=None)
+        for param in model.parameters():
+            param.requires_grad = False
         in_features = model.fc.in_features
         model.fc = nn.Sequential(
             nn.Dropout(p=0.2),
             nn.Linear(in_features, num_classes),
         )
-    else:
-        # Default: mobilenet_v3_small (ultra-compact and blazing fast)
-        model = tv_models.mobilenet_v3_small(weights=tv_models.MobileNet_V3_Small_Weights.DEFAULT)
-        # Freeze feature extraction layers
+
+    elif "resnet" in backbone_name:
+        try:
+            model = tv_models.resnet18(weights=tv_models.ResNet18_Weights.DEFAULT)
+        except Exception as e:
+            print(f"[Custom Vision Engine] Warning: Could not download ResNet-18 weights ({e}), initializing unweighted.")
+            model = tv_models.resnet18(weights=None)
         for param in model.parameters():
             param.requires_grad = False
+        in_features = model.fc.in_features
+        model.fc = nn.Sequential(
+            nn.Dropout(p=0.2),
+            nn.Linear(in_features, num_classes),
+        )
 
+    else:
+        # Default: mobilenet_v3_small (ultra-compact and blazing fast)
+        try:
+            model = tv_models.mobilenet_v3_small(weights=tv_models.MobileNet_V3_Small_Weights.DEFAULT)
+        except Exception as e:
+            print(f"[Custom Vision Engine] Warning: Could not download MobileNet-V3 weights ({e}), initializing unweighted.")
+            model = tv_models.mobilenet_v3_small(weights=None)
+        for param in model.parameters():
+            param.requires_grad = False
         in_features = model.classifier[3].in_features
         model.classifier[3] = nn.Sequential(
             nn.Dropout(p=0.2),

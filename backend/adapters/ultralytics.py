@@ -35,6 +35,10 @@ class UltralyticsAdapter(BackendAdapter):
                 "yolov8s",
                 "yolov8m",
                 "yolov8l",
+                "yolov8x",
+                "yolo11n",
+                "yolo11s",
+                "yolo11m",
                 "yolov8",
                 "yolov8n-cls",
                 "yolov8s-cls",
@@ -45,22 +49,22 @@ class UltralyticsAdapter(BackendAdapter):
         }
 
     def estimate_resources(self, model_name: str, dataset_size: int, config: dict[str, Any]) -> ResourceEstimate:
-        """Estimate resource requirements for YOLOv8 training.
-
-        YOLOv8 nano is lightweight (~3M params) and runs comfortably in 512MB-1GB VRAM or CPU.
-        """
+        """Estimate resource requirements for YOLO training."""
         model_clean = model_name.lower().replace(".pt", "")
-        if "s" in model_clean:
-            vram_mb = 1024
-            params_mb = 40
-        elif "m" in model_clean:
-            vram_mb = 2048
-            params_mb = 100
+        if "x" in model_clean:
+            vram_mb = 6144
+            params_mb = 350
         elif "l" in model_clean:
             vram_mb = 4096
             params_mb = 200
+        elif "m" in model_clean:
+            vram_mb = 2048
+            params_mb = 100
+        elif "s" in model_clean:
+            vram_mb = 1024
+            params_mb = 40
         else:
-            # nano / default yolov8n
+            # nano / default (yolov8n, yolo11n)
             vram_mb = 512
             params_mb = 20
 

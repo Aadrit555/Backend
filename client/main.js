@@ -166,13 +166,19 @@ const archs = {
         { val: 'rag_default', label: 'RAG Default pipeline' }
     ],
     object_detection: [
+        { val: 'yolo11n', label: 'YOLO11 Nano (Next-Gen, High Accuracy & Speed)' },
+        { val: 'yolo11s', label: 'YOLO11 Small (State-of-the-Art Balanced)' },
         { val: 'yolov8n', label: 'YOLOv8 Nano (Fastest, Edge-Optimized)' },
         { val: 'yolov8s', label: 'YOLOv8 Small (Balanced)' },
-        { val: 'yolov8m', label: 'YOLOv8 Medium (High Accuracy)' }
+        { val: 'yolov8m', label: 'YOLOv8 Medium (High Accuracy)' },
+        { val: 'yolov8l', label: 'YOLOv8 Large (Complex Detection)' }
     ],
     vision: [
-        { val: 'mobilenet_v3_small', label: 'MobileNet V3 Small (Fastest)' },
-        { val: 'resnet18', label: 'ResNet-18 (Balanced)' }
+        { val: 'convnext_tiny', label: 'ConvNeXt-Tiny (Modern Pure-ConvNet, Best Accuracy)' },
+        { val: 'efficientnet_b0', label: 'EfficientNet-B0 (Compound Scaled, High Efficiency)' },
+        { val: 'resnet50', label: 'ResNet-50 (Deep Feature Extractor)' },
+        { val: 'resnet18', label: 'ResNet-18 (Fast & Balanced)' },
+        { val: 'mobilenet_v3_small', label: 'MobileNet V3 Small (Ultra-Lightweight)' }
     ]
 };
 
@@ -566,7 +572,7 @@ document.getElementById('builder-btn').addEventListener('click', async () => {
                 body: JSON.stringify({
                     classes: reqClasses,
                     epochs: 10,
-                    backbone: arch === 'mobilenet_v3_small' || arch === 'resnet18' ? arch : 'mobilenet_v3_small'
+                    backbone: arch || 'convnext_tiny'
                 })
             });
             clearInterval(simInterval);

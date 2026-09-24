@@ -765,7 +765,7 @@ async def predict_vision(
 
 class ClassifierTrainRequest(BaseModel):
     classes: dict[str, list[str]]  # name -> list of base64 data URLs
-    backbone: str = "mobilenet_v3_small"  # "mobilenet_v3_small" or "resnet18"
+    backbone: str = "convnext_tiny"  # "convnext_tiny", "efficientnet_b0", "resnet50", "resnet18", "mobilenet_v3_small"
     epochs: int = 10
     lr: float = 0.001
     batch_size: int = 8

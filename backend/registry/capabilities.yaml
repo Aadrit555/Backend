@@ -198,6 +198,54 @@ models:
     description: >
       YOLOv8 Medium — higher accuracy object detection.
 
+  yolov8l:
+    modalities: [image, video]
+    tasks: [object_detection, classification, segmentation]
+    training_methods: [full, transfer]
+    backends: [ultralytics]
+    vram_estimates:
+      full: { min_mb: 4096, recommended_mb: 6144 }
+      transfer: { min_mb: 4096, recommended_mb: 6144 }
+    license: agpl-3.0
+    description: >
+      YOLOv8 Large — high capacity model for complex detection scenarios.
+
+  yolov8x:
+    modalities: [image, video]
+    tasks: [object_detection, classification, segmentation]
+    training_methods: [full, transfer]
+    backends: [ultralytics]
+    vram_estimates:
+      full: { min_mb: 6144, recommended_mb: 8192 }
+      transfer: { min_mb: 6144, recommended_mb: 8192 }
+    license: agpl-3.0
+    description: >
+      YOLOv8 XLarge — maximum accuracy YOLOv8 architecture.
+
+  yolo11n:
+    modalities: [image, video]
+    tasks: [object_detection, classification, segmentation]
+    training_methods: [full, transfer]
+    backends: [ultralytics]
+    vram_estimates:
+      full: { min_mb: 512, recommended_mb: 1024 }
+      transfer: { min_mb: 512, recommended_mb: 1024 }
+    license: agpl-3.0
+    description: >
+      YOLO11 Nano — latest generation Ultralytics architecture offering superior mAP per FLOP.
+
+  yolo11s:
+    modalities: [image, video]
+    tasks: [object_detection, classification, segmentation]
+    training_methods: [full, transfer]
+    backends: [ultralytics]
+    vram_estimates:
+      full: { min_mb: 1024, recommended_mb: 2048 }
+      transfer: { min_mb: 1024, recommended_mb: 2048 }
+    license: agpl-3.0
+    description: >
+      YOLO11 Small — cutting-edge balanced detection model with improved feature representation.
+
 
   # =========================================================================
   # World 4: RAG (Retrieval Augmented Generation)
