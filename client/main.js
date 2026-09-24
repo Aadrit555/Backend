@@ -184,11 +184,11 @@ const archs = {
         { val: 'custom_hf', label: 'Import Hugging Face Model...' }
     ]
 };
-// Alias for vision default
-archs.vision = archs.vision_od;
+// Alias for vision default (Teachable Machine classification)
+archs.vision = archs.vision_cls;
 
 let currentPipeline = 'tabular';
-let currentVisionMode = 'od'; // 'od' (Object Detection) or 'cls' (Classification)
+let currentVisionMode = 'cls'; // Default to Teachable Machine classification
 
 function setVisionMode(mode) {
     currentVisionMode = mode;
@@ -399,49 +399,130 @@ document.getElementById('vs-webcam-toggle')?.addEventListener('click', (e) => {
     }
 });
 
-// Setup click-to-record logic
-document.querySelectorAll('.vs-capture-btn').forEach((btn) => {
-    const classGroup = btn.closest('.vs-class-group');
-    const classIdx = parseInt(classGroup.dataset.class);
+// Teachable Machine dynamic classes & capture
+function setupClassGroupListeners(group) {
+    const classIdx = parseInt(group.dataset.class);
+    const btn = group.querySelector('.vs-capture-btn');
+    const inp = group.querySelector('.vs-class-name');
+    const resetBtn = group.querySelector('.vs-reset-class-btn');
+    const fileInp = group.querySelector('.vs-file-upload');
 
-    // Replace text of the button from HTML since it was "Hold to Record"
-    btn.textContent = "Start Capture";
-    let captureInterval = null;
+    if (inp) {
+        inp.addEventListener('input', (e) => {
+            if (vsClassesData[classIdx]) {
+                vsClassesData[classIdx].name = e.target.value.trim() || `Class ${classIdx + 1}`;
+            }
+        });
+    }
 
-    btn.addEventListener('click', () => {
-        if (captureInterval) {
-            // Stop capturing
-            clearInterval(captureInterval);
-            captureInterval = null;
-            btn.textContent = "Start Capture";
-            btn.style.background = "var(--accent)";
-        } else {
-            // Start capturing
-            if (!vsStream) return;
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            if (vsClassesData[classIdx]) {
+                vsClassesData[classIdx].images = [];
+                group.querySelector('.vs-count').textContent = '0 samples';
+                group.querySelector('.vs-image-preview-container').innerHTML = '';
+            }
+        });
+    }
+
+    if (fileInp) {
+        fileInp.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files || []);
+            files.forEach(f => {
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    const b64 = ev.target.result;
+                    vsClassesData[classIdx].images.push(b64);
+                    group.querySelector('.vs-count').textContent = `${vsClassesData[classIdx].images.length} samples`;
+                    const container = group.querySelector('.vs-image-preview-container');
+                    if (container.children.length < 6) {
+                        const img = document.createElement('img');
+                        img.className = 'vs-img-thumb';
+                        img.src = b64;
+                        container.appendChild(img);
+                    } else {
+                        container.lastChild.src = b64;
+                    }
+                };
+                reader.readAsDataURL(f);
+            });
+        });
+    }
+
+    if (btn) {
+        let captureInterval = null;
+
+        const startCapturing = () => {
+            if (!vsStream || captureInterval) return;
             captureInterval = setInterval(() => {
                 captureFrame(classIdx);
-            }, 200); // 5 FPS
-            btn.textContent = "Stop Capture";
-            btn.style.background = "#ff5f56"; // Red to indicate recording
-        }
-    });
-});
+            }, 150); // ~7 FPS
+            btn.textContent = "Recording...";
+            btn.style.background = "#ff5f56";
+        };
 
-document.querySelectorAll('.vs-class-name').forEach((inp) => {
-    inp.addEventListener('input', (e) => {
-        const classGroup = e.target.closest('.vs-class-group');
-        const classIdx = parseInt(classGroup.dataset.class);
-        vsClassesData[classIdx].name = e.target.value;
-    });
+        const stopCapturing = () => {
+            if (captureInterval) {
+                clearInterval(captureInterval);
+                captureInterval = null;
+                btn.textContent = "Hold / Click to Capture";
+                btn.style.background = "var(--accent)";
+            }
+        };
+
+        // Click or hold behavior
+        btn.addEventListener('mousedown', startCapturing);
+        btn.addEventListener('mouseup', stopCapturing);
+        btn.addEventListener('mouseleave', stopCapturing);
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); startCapturing(); });
+        btn.addEventListener('touchend', stopCapturing);
+    }
+}
+
+// Bind initial classes
+document.querySelectorAll('.vs-class-group').forEach(setupClassGroupListeners);
+
+// Add Class button
+document.getElementById('vs-add-class-btn')?.addEventListener('click', () => {
+    const classIdx = vsClassesData.length;
+    const defaultName = `Class ${classIdx + 1}`;
+    vsClassesData.push({ name: defaultName, images: [] });
+
+    const classesList = document.getElementById('vs-classes-list');
+    if (!classesList) return;
+
+    const group = document.createElement('div');
+    group.className = 'vs-class-group';
+    group.dataset.class = classIdx;
+    group.innerHTML = `
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <input type="text" class="vs-class-name" value="${defaultName}" style="background:transparent; border:1px solid var(--line); border-radius:4px; color:#fff; padding:4px 8px; font-size:13px; font-weight:600; width: 140px;">
+            <button class="vs-reset-class-btn" data-class="${classIdx}" style="background:transparent; border:none; color:#a9a7b4; font-size:12px; cursor:pointer;" title="Reset class samples">Clear</button>
+        </div>
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display:flex; gap: 6px;">
+                <button class="vs-capture-btn"
+                    style="background: var(--accent); color: #000; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Hold / Click to Capture</button>
+                <label class="vs-upload-label" style="background: rgba(255,255,255,0.06); border: 1px solid var(--line); color: #fff; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; display:flex; align-items:center;">
+                    Upload
+                    <input type="file" class="vs-file-upload" data-class="${classIdx}" multiple accept="image/*" style="display:none;">
+                </label>
+            </div>
+            <span class="vs-count" style="font-size: 13px; color: #a9a7b4;">0 samples</span>
+        </div>
+        <div class="vs-image-preview-container"></div>
+    `;
+    classesList.appendChild(group);
+    setupClassGroupListeners(group);
 });
 
 function captureFrame(classIdx) {
     const video = document.getElementById('vs-webcam');
-    if (!video) return;
+    if (!video || !vsClassesData[classIdx]) return;
 
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0);
 
@@ -450,17 +531,17 @@ function captureFrame(classIdx) {
 
     // Update UI
     const classGroup = document.querySelector(`.vs-class-group[data-class="${classIdx}"]`);
-    classGroup.querySelector('.vs-count').textContent = `${vsClassesData[classIdx].images.length} images`;
-
-    // Add thumbnail
-    const container = classGroup.querySelector('.vs-image-preview-container');
-    if (container.children.length < 5) {
-        const img = document.createElement('img');
-        img.className = 'vs-img-thumb';
-        img.src = b64;
-        container.appendChild(img);
-    } else {
-        container.lastChild.src = b64;
+    if (classGroup) {
+        classGroup.querySelector('.vs-count').textContent = `${vsClassesData[classIdx].images.length} samples`;
+        const container = classGroup.querySelector('.vs-image-preview-container');
+        if (container.children.length < 6) {
+            const img = document.createElement('img');
+            img.className = 'vs-img-thumb';
+            img.src = b64;
+            container.appendChild(img);
+        } else {
+            container.lastChild.src = b64;
+        }
     }
 }
 
@@ -494,9 +575,13 @@ async function startVsInference(modelId) {
 
     try {
         if (!vsInferStream) {
-            vsInferStream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 640 }, height: { ideal: 480 } }
-            });
+            if (vsStream && vsStream.active) {
+                vsInferStream = vsStream;
+            } else {
+                vsInferStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 } }
+                });
+            }
         }
         video.srcObject = vsInferStream;
         video.muted = true;
