@@ -84,6 +84,26 @@ def extract_document(file_path: Path) -> list[dict[str, Any]]:
                 "text": file_path.read_text(errors="ignore"),
                 "metadata": {"source": file_path.name}
             })
+    elif suffix == ".pptx":
+        try:
+            import zipfile
+            import xml.etree.ElementTree as ET
+            with zipfile.ZipFile(file_path) as pptx:
+                slide_texts = []
+                for name in pptx.namelist():
+                    if name.startswith("ppt/slides/slide") and name.endswith(".xml"):
+                        xml_content = pptx.read(name)
+                        tree = ET.fromstring(xml_content)
+                        texts = [node.text for node in tree.iter("{http://schemas.openxmlformats.org/drawingml/2006/main}t") if node.text]
+                        if texts:
+                            slide_texts.append(" ".join(texts))
+                text = "\n\n".join(slide_texts)
+                docs.append({
+                    "text": text,
+                    "metadata": {"source": file_path.name}
+                })
+        except Exception as e:
+            print(f"[RAG Adapter] Error parsing PPTX {file_path.name}: {e}")
     elif suffix == ".pdf":
         try:
             from pypdf import PdfReader
@@ -95,11 +115,8 @@ def extract_document(file_path: Path) -> list[dict[str, Any]]:
                         "text": page_text,
                         "metadata": {"source": file_path.name, "page": page_idx + 1}
                     })
-        except Exception:
-            docs.append({
-                "text": file_path.read_text(errors="ignore"),
-                "metadata": {"source": file_path.name}
-            })
+        except Exception as e:
+            print(f"[RAG Adapter] Error parsing PDF {file_path.name}: {e}")
     else:
         text = file_path.read_text(encoding="utf-8", errors="ignore")
         docs.append({

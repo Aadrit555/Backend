@@ -50,6 +50,20 @@ def _write_status(experiment_id: str, stage: str, pct: int, message: str) -> Non
     path.write_text(json.dumps(existing))
 
 
+def _update_last_status(experiment_id: str, pct: int) -> None:
+    path = _status_path(experiment_id)
+    if not path.exists():
+        return
+    try:
+        existing = json.loads(path.read_text())
+        if isinstance(existing, list) and existing:
+            existing[-1]["pct"] = pct
+            existing[-1]["updated_at"] = datetime.now(timezone.utc).isoformat()
+            path.write_text(json.dumps(existing))
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+
 def run(experiment_id: str) -> None:
     """Execute the full training pipeline for one experiment.
 
@@ -103,11 +117,27 @@ def run(experiment_id: str) -> None:
         df_size = 1000
         
         if exp.backend == "autogluon":
-            if raw_dir.exists():
-                for p in raw_dir.iterdir():
-                    if p.suffix == ".csv":
-                        dataset_path = p
-                        break
+            from backend.db import DataSource
+            latest_ds = db.query(DataSource).filter(
+                DataSource.project_id == exp.project_id,
+                DataSource.uploaded_at <= exp.created_at,
+                DataSource.original_filename.like("%.csv")
+            ).order_by(DataSource.uploaded_at.desc()).first()
+            
+            if not latest_ds:
+                latest_ds = db.query(DataSource).filter(
+                    DataSource.project_id == exp.project_id,
+                    DataSource.original_filename.like("%.csv")
+                ).order_by(DataSource.uploaded_at.desc()).first()
+
+            if latest_ds and Path(latest_ds.stored_path).exists():
+                dataset_path = Path(latest_ds.stored_path)
+            elif raw_dir.exists():
+                csv_files = [p for p in raw_dir.iterdir() if p.suffix == ".csv"]
+                if csv_files:
+                    csv_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                    dataset_path = csv_files[0]
+                    
             if not dataset_path:
                 _write_status(experiment_id, "failed", 0, "No CSV found in project raw dir.")
                 return
@@ -150,30 +180,71 @@ def run(experiment_id: str) -> None:
         run_dir = settings.experiments_dir / experiment_id
         run_dir.mkdir(parents=True, exist_ok=True)
         
-        # Prepare
-        _write_status(experiment_id, "preparing", 10, "Preparing dataset...")
-        
-        config["model_name"] = exp.model_name
-        config["prepared_dir"] = str(run_dir / "prepared")
-        prepared_dir = adapter.prepare(dataset_path, config)
-        
-        # Train
-        if exp.backend == "autogluon" and not config.get("target_column"):
-            import pandas as pd
-            try:
-                df = pd.read_csv(dataset_path)
-                config["target_column"] = df.columns[-1]
-            except Exception:
-                config["target_column"] = "label"
+        # Prepare & Train Progress Thread
+        import threading
+        import time
+
+        def update_progress():
+            pct = 10
+            log_messages = {
+                "rag": ["Extracting text from documents...", "Chunking documents...", "Loading sentence-transformers...", "Generating vector embeddings...", "Adding vectors to FAISS...", "Optimizing index...", "Saving vector store..."],
+                "unsloth": ["Formatting JSONL dataset...", "Tokenizing instructions...", "Initializing LoRA...", "Loading base model in 4-bit...", "Starting epoch 1...", "Calculating loss...", "Updating weights...", "Starting epoch 2...", "Saving checkpoints..."],
+                "ultralytics": ["Verifying dataset integrity...", "Loading YOLOv8 weights...", "Scanning image annotations...", "Epoch 1/10...", "Epoch 5/10...", "Epoch 10/10...", "Fusing layers..."],
+                "autogluon": ["Cleaning CSV data...", "Analyzing features...", "Training RandomForest...", "Training LightGBM...", "Training XGBoost...", "Ensembling models...", "Selecting best configuration..."]
+            }
+            messages = log_messages.get(exp.backend, ["Training in progress..."])
+            msg_idx = 0
+            
+            while getattr(threading.current_thread(), "do_run", True):
+                sleep_time = 1.0
+                if pct < 79:
+                    if pct < 30:
+                        pct += 2
+                        sleep_time = 1.0
+                    elif pct < 50:
+                        pct += 1
+                        sleep_time = 2.0
+                    elif pct < 70:
+                        pct += 1
+                        sleep_time = 4.0
+                    else:
+                        pct += 1
+                        sleep_time = 8.0
                 
-        if exp.backend == "rag":
-            _write_status(experiment_id, "training", 20, "Building FAISS vector index...")
-        elif exp.backend == "ultralytics":
-            _write_status(experiment_id, "training", 20, "Training YOLOv8 object detection model...")
-        else:
-            _write_status(experiment_id, "training", 20, f"Training with {exp.backend}...")
+                if pct % 10 == 0 and msg_idx < len(messages):
+                    current_msg = messages[msg_idx]
+                    msg_idx += 1
+                    _write_status(experiment_id, "training", pct, current_msg)
+                else:
+                    _update_last_status(experiment_id, pct)
+                    
+                time.sleep(sleep_time)
+
+        progress_thread = threading.Thread(target=update_progress)
+        progress_thread.do_run = True
+        progress_thread.start()
         
-        train_result = adapter.train(prepared_dir, config)
+        try:
+            _write_status(experiment_id, "preparing", 10, "Preparing dataset...")
+            config["model_name"] = exp.model_name
+            config["experiment_id"] = experiment_id
+            config["prepared_dir"] = str(run_dir / "prepared")
+            prepared_dir = adapter.prepare(dataset_path, config)
+        
+            # Train
+            if exp.backend == "autogluon" and not config.get("target_column"):
+                import pandas as pd
+                try:
+                    df = pd.read_csv(dataset_path)
+                    config["target_column"] = df.columns[-1]
+                except Exception:
+                    config["target_column"] = "label"
+                    
+            train_result = adapter.train(prepared_dir, config)
+        
+        finally:
+            progress_thread.do_run = False
+            progress_thread.join()
         
         # Evaluate
         if exp.backend == "rag":

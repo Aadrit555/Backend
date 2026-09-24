@@ -1,36 +1,27 @@
-from __future__ import annotations
-
 from typing import Any
-import torch
+import os
+from groq import Groq
+from dotenv import load_dotenv
 
-_rag_llm = None
-_rag_tokenizer = None
+_groq_client = None
 
-def get_rag_llm():
-    """Load local Llama-3.2-1B model on GPU for genuine RAG generation."""
-    global _rag_llm, _rag_tokenizer
-    if not torch.cuda.is_available():
-        raise RuntimeError("CUDA GPU is not available for Unsloth LLM.")
-    if _rag_llm is None:
-        print("[RAG] Initializing local Llama-3.2-1B on GPU for real-time generative RAG...")
-        from unsloth import FastLanguageModel
-        from unsloth.chat_templates import get_chat_template
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            "unsloth/Llama-3.2-1B-Instruct-bnb-4bit",
-            max_seq_length=1024,
-            load_in_4bit=True,
-            device_map="cuda"
-        )
-        FastLanguageModel.for_inference(model)
-        tokenizer = get_chat_template(tokenizer, chat_template="llama-3.1")
-        _rag_llm = model
-        _rag_tokenizer = tokenizer
-    return _rag_llm, _rag_tokenizer
+def get_groq_client():
+    global _groq_client
+    if _groq_client is None:
+        # Load from the root .env where the API keys actually live
+        env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
+        load_dotenv(dotenv_path=env_path)
+        
+        api_key = os.environ.get("GROQ_API_KEY_1")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY_1 is missing from environment variables.")
+        _groq_client = Groq(api_key=api_key)
+    return _groq_client
 
 def generate_answer(query: str, retrieved_chunks: list[dict[str, Any]]) -> dict[str, Any]:
     """
     Generate an answer to the query using only the provided context chunks.
-    Uses local Llama-3.2 on GPU for genuine, conversational answers.
+    Uses Groq for lightning fast, conversational answers.
     """
     if not retrieved_chunks:
         return {
@@ -53,8 +44,6 @@ def generate_answer(query: str, retrieved_chunks: list[dict[str, Any]]) -> dict[
     system_prompt = (
         "You are an expert, helpful AI assistant analyzing a provided document.\n"
         "Your task is to answer the user's question accurately, directly, and comprehensively based on the context:\n"
-        "Your task is to answer the user's question accurately, directly, and comprehensively based solely on the provided context:\n"
-        "- If the provided context does not contain the information needed to answer the question, explicitly state: 'I don't know based on the provided context.' or that the information is not provided.\n"
         "- If asked where someone studies, their university, or education: state their university (e.g. SRM University AP), degree, and coursework clearly.\n"
         "- If asked about projects: list their projects and key technical implementations with concise bullet points.\n"
         "- If asked about skills, experience, or background: summarize the relevant details directly.\n"
@@ -63,52 +52,33 @@ def generate_answer(query: str, retrieved_chunks: list[dict[str, Any]]) -> dict[
     )
     user_prompt = f"Document Context:\n\"\"\"\n{context_text}\n\"\"\"\n\nUser Question: {query}"
     
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt}
-    ]
-    
     answer = None
     try:
-        llm, tok = get_rag_llm()
-        inputs = tok.apply_chat_template(messages, tokenize=True, add_generation_prompt=True, return_tensors="pt").to("cuda")
-        outputs = llm.generate(input_ids=inputs, max_new_tokens=256, temperature=0.1, use_cache=True, pad_token_id=tok.eos_token_id)
-        answer = tok.batch_decode(outputs[:, inputs.shape[1]:], skip_special_tokens=True)[0]
+        client = get_groq_client()
+        completion = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=1,
+            max_completion_tokens=2048,
+            top_p=1,
+            reasoning_effort="medium",
+            stream=True,
+            stop=None
+        )
+        answer = ""
+        for chunk in completion:
+            answer += chunk.choices[0].delta.content or ""
     except Exception as e:
-        print(f"[RAG] Local LLM error: {e}")
+        print(f"[RAG] Groq API error: {e}")
         
     if not answer:
-        try:
-            from backend.orchestrator.groq_client import _get_active_client
-            client = _get_active_client()
-            chat_resp = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=messages,
-                temperature=0.1,
-                max_tokens=256,
-            )
-            answer = chat_resp.choices[0].message.content
-        except Exception as e:
-            print(f"[RAG] Groq fallback error: {e}")
-
-    if not answer:
-        import re
-        stop_words = {
-            "what", "is", "the", "for", "a", "an", "in", "of", "to", "how",
-            "many", "do", "does", "get", "about", "and", "or", "on", "at",
-            "by", "from", "with", "this", "that", "these", "those", "are", "were"
-        }
-        query_tokens = set(re.findall(r"\b[a-z0-9]+\b", query.lower())) - stop_words
-        context_tokens = set(re.findall(r"\b[a-z0-9]+\b", context_text.lower()))
-        overlap = query_tokens & context_tokens
+        top_chunk = retrieved_chunks[0]
+        src = top_chunk.get("metadata", {}).get("source", "document")
+        answer = f"**[Source: {src}]**\n\n" + top_chunk["text"].strip()
         
-        if not overlap:
-            answer = "I don't know based on the provided context."
-        else:
-            top_chunk = retrieved_chunks[0]
-            src = top_chunk.get("metadata", {}).get("source", "document")
-            answer = f"**[Source: {src}]**\n\n" + top_chunk["text"].strip()
-
     return {
         "answer": answer,
         "citations": retrieved_chunks

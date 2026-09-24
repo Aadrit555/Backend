@@ -141,19 +141,56 @@ class UltralyticsAdapter(BackendAdapter):
             except Exception as e:
                 print(f"[UltralyticsAdapter] Warning reading existing yaml: {e}")
 
-        # 3. Handle loose image files
-        valid_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+        # 3. Handle loose image and video files
+        import cv2
+
+        valid_img_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+        valid_vid_extensions = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
         image_files = []
+        video_files = []
+
         for sdir in search_dirs:
             if sdir.exists():
-                for ext in valid_extensions:
+                for ext in valid_img_extensions:
                     image_files.extend(list(sdir.rglob(f"*{ext}")))
                     image_files.extend(list(sdir.rglob(f"*{ext.upper()}")))
+                for ext in valid_vid_extensions:
+                    video_files.extend(list(sdir.rglob(f"*{ext}")))
+                    video_files.extend(list(sdir.rglob(f"*{ext.upper()}")))
 
         image_files = list(set(image_files))
+        video_files = list(set(video_files))
+
+        # Extract frames from videos if present
+        video_extracted_dir = prepared_dir / "video_frames"
+        if video_files:
+            video_extracted_dir.mkdir(parents=True, exist_ok=True)
+            for vid_path in video_files:
+                try:
+                    cap = cv2.VideoCapture(str(vid_path))
+                    fps = cap.get(cv2.CAP_PROP_FPS) or 25
+                    step = max(1, int(fps))  # extract ~1 frame per second
+                    frame_idx = 0
+                    saved_idx = 0
+                    max_frames_per_vid = 40
+
+                    while cap.isOpened() and saved_idx < max_frames_per_vid:
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+                        if frame_idx % step == 0:
+                            frame_out = video_extracted_dir / f"{vid_path.stem}_f{saved_idx:04d}.jpg"
+                            cv2.imwrite(str(frame_out), frame)
+                            image_files.append(frame_out)
+                            saved_idx += 1
+                        frame_idx += 1
+                    cap.release()
+                    print(f"[UltralyticsAdapter] Extracted {saved_idx} frames from video {vid_path.name}")
+                except Exception as ve:
+                    print(f"[UltralyticsAdapter] Warning: failed to extract frames from {vid_path}: {ve}")
 
         if not image_files:
-            print("[UltralyticsAdapter] No images found, creating minimal dataset template...")
+            print("[UltralyticsAdapter] No images or video frames found, creating minimal dataset template...")
             fallback_yaml = prepared_dir / "data.yaml"
             fallback_yaml.write_text(
                 "names:\n  0: person\n  1: car\npath: " + str(prepared_dir.resolve()).replace("\\", "/") + "\ntrain: images/train\nval: images/val\n"

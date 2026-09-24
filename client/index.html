@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Unified Model Interface</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #000;
+            --text: #f4f3f8;
+            --muted: #a9a7b4;
+            --line: rgba(255, 255, 255, .10);
+            --line-strong: rgba(255, 255, 255, .16);
+            --panel: rgba(10, 9, 14, .78);
+            --accent: #b9a2f5;
+            --accent-2: #a58bf0;
+            box-sizing: border-box;
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        .chat-md p {
+            margin: 0 0 10px 0;
+        }
+
+        .chat-md p:last-child {
+            margin-bottom: 0;
+        }
+
+        .chat-md ul,
+        .chat-md ol {
+            margin: 0 0 10px 20px;
+            padding: 0;
+        }
+
+        .chat-md ul:last-child,
+        .chat-md ol:last-child {
+            margin-bottom: 0;
+        }
+
+        .chat-md strong {
+            color: #fff;
+        }
+
+        .chat-md pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        .chat-md code {
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        html {
+            scroll-padding-top: env(safe-area-inset-top, 0px)
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Inter", system-ui, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale
+        }
+
+        body {
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden
+        }
+
+        .bg {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 0;
+            background: linear-gradient(135deg, #2b1f3c 0%, #150a1d 100%);
+        }
+
+        .bg-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        nav {
+            position: relative;
+            z-index: 2;
+            height: 66px;
+            border-bottom: 1px solid var(--line);
+            background: transparent;
+            display: flex;
+            justify-content: center;
+            align-items: stretch;
+            gap: 6px
+        }
+
+        nav a {
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding: 0 19px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #000;
+            text-decoration: none;
+            letter-spacing: .005em;
+            transition: color .15s;
+            cursor: pointer;
+        }
+
+        nav a:hover {
+            color: #333
+        }
+
+        nav a.active {
+            color: #000;
+            font-weight: 700
+        }
+
+        nav a.active::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 4px;
+            height: 2px;
+            background: linear-gradient(90deg, #fff 0%, #d9cdfa 100%);
+            border-radius: 2px
+        }
+
+        nav a:focus-visible,
+        button:focus-visible,
+        .select:focus-visible,
+        .drop:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 3px
+        }
+
+        main {
+            position: relative;
+            z-index: 2;
+            padding-bottom: 80px;
+        }
+
+        .hero {
+            text-align: center;
+            padding-top: 64px
+        }
+
+        h1 {
+            margin: 0;
+            font-weight: 700;
+            font-size: clamp(46px, 7.25vw, 80px);
+            line-height: 1.05;
+            letter-spacing: -.035em;
+            color: #000;
+        }
+
+        h1 .grad {
+            background: linear-gradient(90deg, #6c46d1 0%, #894bbf 55%, #b155b9 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent
+        }
+
+        .sub {
+            margin: 28px auto 0;
+            max-width: 700px;
+            font-size: 15px;
+            line-height: 26px;
+            letter-spacing: .05em;
+            color: #000;
+            font-weight: 500;
+        }
+
+        .tabs {
+            width: min(956px, 92%);
+            margin: 50px auto 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .tab {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: none;
+            border: 0;
+            color: #222;
+            font: 500 15px/1 "Inter", system-ui, sans-serif;
+            padding: 0 25px;
+            height: 60px;
+            cursor: pointer;
+            transition: color .15s;
+            white-space: nowrap
+        }
+
+        .tab:hover {
+            color: #000
+        }
+
+        .tab svg {
+            width: 24px;
+            height: 24px;
+            flex: none;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-linejoin: round
+        }
+
+        .tab.active {
+            color: #000;
+            font-weight: 700
+        }
+
+        .tab.active::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -1px;
+            height: 2px;
+            background: linear-gradient(90deg, #6c46d1 0%, #b155b9 100%)
+        }
+
+        .tab-sep {
+            width: 1px;
+            height: 22px;
+            background: rgba(255, 255, 255, .28)
+        }
+
+        .flow {
+            position: relative;
+            width: min(1247px, calc(100% - 48px));
+            margin: 0 auto;
+            left: 24px;
+            padding-top: 0
+        }
+
+        .step {
+            position: relative;
+            padding: 0 9px
+        }
+
+        .step .num {
+            position: absolute;
+            left: -76px;
+            top: 2px;
+            font-size: 15px;
+            color: #000;
+            font-weight: 400;
+            width: 40px;
+            text-align: center;
+            letter-spacing: .02em
+        }
+
+        .step .rail {
+            position: absolute;
+            left: -57px;
+            width: 1px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .25))
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 500;
+            letter-spacing: -.005em;
+            color: #fff;
+            line-height: 22px
+        }
+
+        .hint {
+            margin: 7px 0 0;
+            font-size: 13.5px;
+            color: #fff;
+            font-weight: 400;
+            line-height: 18px
+        }
+
+        /* Layout steps heights (adjustable per view) */
+        .step.s1 {
+            margin-top: 52px;
+            padding-bottom: 25px;
+        }
+
+        .step.s1 .rail {
+            top: 30px;
+            height: calc(100% - 5px);
+        }
+
+        .step.s2 {
+            margin-top: 0;
+            min-height: 255px;
+            padding-bottom: 35px;
+        }
+
+        .step.s2 .rail {
+            top: 38px;
+            height: calc(100% - 15px);
+        }
+
+        .step.s-auto {
+            margin-top: 52px;
+            padding-bottom: 25px;
+        }
+
+        .step.s-auto .rail {
+            top: 30px;
+            height: calc(100% - 5px);
+        }
+
+        .step.s-auto2 {
+            margin-top: 0;
+            padding-bottom: 25px;
+        }
+
+        .step.s-auto2 .rail {
+            top: 38px;
+            height: 100%;
+        }
+
+        /* select */
+        .select {
+            position: relative;
+            margin-top: 17px;
+            width: 1020px;
+            max-width: 100%;
+            height: 51px;
+            background: var(--panel);
+            border: 1px solid var(--line-strong);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            color: #fff;
+            transition: border-color .15s, background .15s
+        }
+
+        .select:hover {
+            border-color: rgba(255, 255, 255, .28)
+        }
+
+        .select .ico {
+            width: 60px;
+            display: grid;
+            place-items: center;
+            color: #e9e7f2
+        }
+
+        .select .ico svg {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.6;
+            stroke-linecap: round
+        }
+
+        .select .val {
+            flex: 1;
+            font-size: 13.5px;
+            font-weight: 400;
+            color: #f1f0f7;
+            margin-left: -14px
+        }
+
+        .select .chev {
+            width: 49px;
+            height: 100%;
+            display: grid;
+            place-items: center;
+            border-left: 1px solid var(--line-strong)
+        }
+
+        .select .chev svg {
+            width: 18px;
+            height: 18px;
+            stroke: #e9e7f2;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: transform .2s
+        }
+
+        .select.open .chev svg {
+            transform: rotate(180deg)
+        }
+
+        .menu {
+            position: absolute;
+            left: -1px;
+            right: -1px;
+            top: calc(100% + 6px);
+            z-index: 20;
+            background: #0c0b12;
+            border: 1px solid var(--line-strong);
+            border-radius: 8px;
+            padding: 6px;
+            display: none;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, .6);
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .select.open .menu {
+            display: block
+        }
+
+        .menu div {
+            padding: 11px 14px;
+            font-size: 13.5px;
+            border-radius: 6px;
+            color: #dcdae6
+        }
+
+        .menu div:hover,
+        .menu div.sel {
+            background: rgba(185, 162, 245, .14);
+            color: #fff
+        }
+
+        /* Training data */
+        .fmt {
+            position: absolute;
+            right: 2px;
+            top: 22px;
+            font-size: 13.5px;
+            color: #c4c2ce;
+            letter-spacing: .005em
+        }
+
+        .drop {
+            margin-top: 20px;
+            width: 100%;
+            height: 115px;
+            border: 1px dashed rgba(255, 255, 255, .42);
+            border-radius: 9px;
+            background: rgba(6, 5, 9, .55);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            transition: background .15s, border-color .15s;
+            cursor: pointer
+        }
+
+        .drop.over {
+            border-color: var(--accent);
+            background: rgba(120, 90, 200, .14)
+        }
+
+        .drop svg {
+            width: 36px;
+            height: 30px;
+            stroke: #fff;
+            fill: none;
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            margin-bottom: 9px
+        }
+
+        .drop .t {
+            font-size: 16px;
+            font-weight: 500;
+            color: #fff;
+            line-height: 20px
+        }
+
+        .drop .o {
+            margin-top: 5px;
+            font-size: 14px;
+            color: #c4c2ce
+        }
+
+        .drop .o span {
+            color: #d7c9fb;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            text-decoration-thickness: 1px;
+            margin-left: 4px;
+            cursor: pointer
+        }
+
+        .drop input {
+            display: none
+        }
+
+        .files {
+            margin-top: 18px;
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(8, 7, 11, .72);
+            overflow: hidden
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 365px 207px 1fr auto;
+            align-items: center;
+            min-height: 45px;
+            padding: 0 17px;
+            font-size: 13.5px;
+            color: #e9e7f2
+        }
+
+        .row.head {
+            height: 45px;
+            color: #dedce8
+        }
+
+        .row.item {
+            border-top: 1px solid var(--line);
+            color: #cfcdd9
+        }
+
+        .row .rm {
+            background: none;
+            border: 0;
+            color: #e9e7f2;
+            font: inherit;
+            cursor: pointer;
+            padding: 6px 0 6px 12px
+        }
+
+        .row .rm:hover {
+            color: #fff;
+            text-decoration: underline
+        }
+
+        .row.item .rm {
+            color: #9d9aac
+        }
+
+        /* build */
+        .build-wrap {
+            position: relative;
+            width: min(1247px, calc(100% - 48px));
+            margin: 33px auto 0;
+            left: 24px;
+            padding-bottom: 62px
+        }
+
+        .build-wrap .num {
+            position: absolute;
+            left: -58px;
+            top: 12px;
+            font-size: 15px;
+            color: #000;
+            width: 40px;
+            text-align: center
+        }
+
+        .build {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            height: 45px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            cursor: pointer;
+            background: #c4c2ce;
+            color: #0b0a10;
+            font: 500 15px/1 "Inter", system-ui, sans-serif;
+            letter-spacing: .005em;
+            transition: background .15s, transform .05s, color .15s
+        }
+
+        .build:hover {
+            background: #d9d7dc;
+            color: #000
+        }
+
+        .build:active {
+            transform: translateY(1px)
+        }
+
+        .build svg {
+            width: 17px;
+            height: 17px;
+            stroke: #0b0a10;
+            fill: none;
+            stroke-width: 1.9;
+            stroke-linecap: round;
+            stroke-linejoin: round
+        }
+
+        /* Utilities */
+        .hidden {
+            display: none !important;
+        }
+
+        .logs-container {
+            margin-top: 15px;
+            background: #0c0b12;
+            border: 1px solid var(--line-strong);
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            color: #cfcdd9;
+        }
+
+        .status-msg {
+            margin-top: 15px;
+            font-size: 14px;
+            text-align: center;
+            color: #fff;
+        }
+
+        .output-box {
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(10, 9, 14, .78);
+            border: 1px solid var(--line-strong);
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #fff;
+            min-height: 80px;
+        }
+
+        .vs-class-group {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(8, 7, 11, .72);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+        }
+
+        .vs-class-name {
+            width: 100%;
+            background: transparent;
+            border: 0;
+            border-bottom: 1px solid var(--line-strong);
+            color: #fff;
+            font-size: 15px;
+            padding: 5px 0;
+            margin-bottom: 15px;
+            outline: none;
+        }
+
+        .vs-image-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .vs-img-thumb {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid var(--line);
+        }
+
+        /* Terminal & Leaderboard */
+        .terminal-wrap {
+            margin-top: 25px;
+            background: rgba(10, 9, 14, .85);
+            border: 1px solid var(--line-strong);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .term-header {
+            height: 32px;
+            background: rgba(255, 255, 255, .05);
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            gap: 6px;
+        }
+
+        .term-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .term-dot.r {
+            background: #ff5f56;
+        }
+
+        .term-dot.y {
+            background: #ffbd2e;
+        }
+
+        .term-dot.g {
+            background: #27c93f;
+        }
+
+        .term-body {
+            padding: 15px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 13px;
+            color: #cfcdd9;
+            max-height: 250px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+
+        .term-line {
+            margin-bottom: 4px;
+        }
+
+        .term-line .time {
+            color: #888;
+            margin-right: 10px;
+        }
+
+        .term-line .stage {
+            color: var(--accent-2);
+            margin-right: 10px;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+
+        .progress-wrap {
+            height: 16px;
+            background: rgba(255, 255, 255, .1);
+            margin: 0 15px 15px 15px;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #c4c2ce;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: #0b0a10;
+        }
+
+        .leaderboard-wrap {
+            margin-top: 15px;
+            border-top: 1px solid var(--line);
+            padding-top: 15px;
+            padding-bottom: 20px;
+            padding-right: 15px;
+        }
+
+        .leaderboard-title {
+            font-size: 15px;
+            color: #fff;
+            font-weight: 500;
+            margin-bottom: 10px;
+            padding: 0 15px;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13.5px;
+            text-align: left;
+        }
+
+        .leaderboard-table th {
+            padding: 10px 15px;
+            color: #dedce8;
+            border-bottom: 1px solid var(--line);
+            font-weight: 500;
+        }
+
+        .leaderboard-table td {
+            padding: 10px 15px;
+            color: #cfcdd9;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .leaderboard-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .leaderboard-table tr.best {
+            background: rgba(185, 162, 245, .1);
+        }
+
+        .best-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: #000;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal {
+            background: #0c0b12;
+            border: 1px solid var(--line-strong);
+            border-radius: 12px;
+            width: min(600px, 90vw);
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            transform: translateY(15px) scale(0.98);
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        .modal-overlay.active .modal {
+            transform: translateY(0) scale(1);
+        }
+
+        .modal-header {
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #a9a7b4;
+            cursor: pointer;
+            padding: 4px;
+            display: grid;
+            place-items: center;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .modal-body {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .hf-search-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .hf-search-input {
+            width: 100%;
+            height: 46px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--line-strong);
+            border-radius: 8px;
+            color: #fff;
+            padding: 0 16px 0 42px;
+            font-family: inherit;
+            font-size: 14.5px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .hf-search-input:focus {
+            border-color: var(--accent);
+        }
+
+        .hf-search-icon {
+            position: absolute;
+            left: 14px;
+            top: 14px;
+            width: 18px;
+            height: 18px;
+            color: #a9a7b4;
+        }
+
+        .hf-results {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .hf-result-item {
+            padding: 12px 14px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .hf-result-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: var(--line-strong);
+        }
+
+        .hf-result-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #fff;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hf-result-stats {
+            font-size: 12px;
+            color: #a9a7b4;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .hf-result-stats span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        @media (max-width:1100px) {
+
+            .flow,
+            .build-wrap {
+                left: 0;
+                width: calc(100% - 96px);
+                margin-left: auto;
+                margin-right: 24px
+            }
+
+            .row {
+                grid-template-columns: 1.6fr 1fr 1fr auto
+            }
+        }
+
+        @media (max-width:760px) {
+            nav {
+                overflow-x: auto;
+                justify-content: flex-start;
+                gap: 0;
+                padding: 0 8px
+            }
+
+            nav a {
+                padding: 0 14px;
+                flex: none
+            }
+
+            .hero {
+                padding-top: 44px
+            }
+
+            .sub {
+                letter-spacing: .08em;
+                font-size: 13px;
+                padding: 0 20px
+            }
+
+            .tabs {
+                overflow-x: auto;
+                justify-content: flex-start
+            }
+
+            .tab {
+                padding: 0 16px;
+                flex: none
+            }
+
+            .flow,
+            .build-wrap {
+                width: calc(100% - 64px);
+                margin-left: 56px;
+                margin-right: 8px
+            }
+
+            .step .num,
+            .build-wrap .num {
+                left: -52px
+            }
+
+            .step .rail {
+                left: -33px
+            }
+
+            .fmt {
+                position: static;
+                margin-top: 6px;
+                display: block
+            }
+
+            .step.s2 {
+                height: auto;
+                padding-bottom: 20px
+            }
+
+            .step.s2 .rail {
+                height: 100%
+            }
+
+            .row {
+                grid-template-columns: 1fr 70px 70px auto;
+                font-size: 12.5px;
+                padding: 0 12px
+            }
+        }
+
+        @media (prefers-reduced-motion:reduce) {
+            * {
+                transition: none !important
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="bg" aria-hidden="true">
+        <video class="bg-video" autoplay muted loop playsinline>
+            <source
+                src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260809_012548_ef22562c-c0ae-4816-ad9d-f8922af4e6a7.mp4"
+                type="video/mp4" />
+        </video>
+    </div>
+
+    <nav aria-label="Primary" id="main-nav">
+        <a data-view="view-home" class="hidden">Home</a>
+        <a data-view="view-model-builder" class="active">Model Builder</a>
+        <a data-view="view-data-factory">Data Factory</a>
+        <a data-view="view-runner" class="hidden">Runner</a>
+    </nav>
+
+    <!-- VIEW: HOME -->
+    <main id="view-home" class="view hidden">
+        <section class="hero">
+            <h1>Intelligence <span class="grad">Designed To Evolve.</span></h1>
+            <p class="sub">Welcome to the AI platform.</p>
+        </section>
+    </main>
+
+    <!-- VIEW: MODEL BUILDER -->
+    <main id="view-model-builder" class="view">
+        <section class="hero">
+            <h1 id="builder-main-title">Build your <span class="grad">model.</span></h1>
+            <p class="sub" id="builder-main-sub">Select your pipeline, provide your training data, and let the platform
+                handle the rest. We construct and tune the model architecture automatically.</p>
+        </section>
+
+        <div class="tabs" role="tablist" id="builder-tabs">
+            <button class="tab active" data-val="tabular">
+                <svg viewBox="0 0 24 24" style="fill:currentColor;stroke:none">
+                    <g>
+                        <circle cx="4" cy="4" r="1.7" />
+                        <circle cx="12" cy="4" r="1.7" />
+                        <circle cx="20" cy="4" r="1.7" />
+                        <circle cx="4" cy="12" r="1.7" />
+                        <circle cx="12" cy="12" r="1.7" />
+                        <circle cx="20" cy="12" r="1.7" />
+                        <circle cx="4" cy="20" r="1.7" />
+                        <circle cx="12" cy="20" r="1.7" />
+                        <circle cx="20" cy="20" r="1.7" />
+                    </g>
+                </svg>
+                Tabular ML
+            </button>
+            <span class="tab-sep"></span>
+            <button class="tab" data-val="llm">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 2.8 20 7.4v9.2l-8 4.6-8-4.6V7.4z" />
+                    <path d="M4 7.4 12 12l8-4.6" />
+                    <path d="M12 12v9.2" />
+                </svg>
+                LLM Fine-Tuning
+            </button>
+            <span class="tab-sep"></span>
+            <button class="tab" data-val="rag">
+                <svg viewBox="0 0 24 24">
+                    <ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" />
+                    <path d="M4.5 5.5v13c0 1.55 3.35 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-13" />
+                    <path d="M4.5 12c0 1.55 3.35 2.8 7.5 2.8s7.5-1.25 7.5-2.8" />
+                </svg>
+                RAG Intelligence
+            </button>
+            <span class="tab-sep"></span>
+            <button class="tab" data-val="object_detection">
+                <svg viewBox="0 0 24 24" style="stroke-width: 1.8;">
+                    <rect width="18" height="18" x="3" y="3" rx="2" />
+                    <path d="m9 9 3 3-3 3" />
+                    <path d="m15 15-3-3 3-3" />
+                </svg>
+                Object Detection
+            </button>
+            <span class="tab-sep"></span>
+            <button class="tab" data-val="vision">
+                <svg viewBox="0 0 24 24" style="width:28px">
+                    <path d="M1.5 12S5.6 5.2 12 5.2 22.5 12 22.5 12 18.4 18.8 12 18.8 1.5 12 1.5 12z" />
+                    <circle cx="12" cy="12" r="3.2" />
+                </svg>
+                Vision Studio
+            </button>
+        </div>
+
+        <div class="flow">
+            <section class="step s1">
+                <span class="num">01</span><span class="rail"></span>
+                <h2>Model Architecture</h2>
+                <p class="hint">Select a pre-configured architecture</p>
+                <div class="select" id="builder-select">
+                    <span class="ico"><svg viewBox="0 0 24 24">
+                            <circle cx="10.5" cy="10.5" r="6.5" />
+                            <path d="m20 20-4.9-4.9" />
+                        </svg></span>
+                    <span class="val" id="builder-val">AutoGluon Best</span>
+                    <span class="chev"><svg viewBox="0 0 24 24">
+                            <path d="m6 9 6 6 6-6" />
+                        </svg></span>
+                    <div class="menu" id="builder-menu">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                <input type="text" id="builder-custom-hf" class="hidden" placeholder="e.g. meta-llama/Llama-3.2-1B"
+                    style="margin-top: 15px; width: 1020px; max-width: 100%; height: 51px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; color: #fff; padding: 0 15px; font-family: inherit; font-size: 14px; outline: none;">
+            </section>
+
+            <section class="step s2">
+                <span class="num">02</span><span class="rail"></span>
+                <h2 id="s2-title">Training Data</h2>
+                <p class="hint" id="s2-hint">Upload your dataset to get started</p>
+
+                <div id="builder-data-ui">
+                    <span class="fmt" id="builder-fmt">Supported formats: CSV, XLSX, PARQUET, TXT, JSONL</span>
+                    <div class="drop" id="builder-drop">
+                        <svg viewBox="0 0 36 30">
+                            <path
+                                d="M9.5 22.5H9a6.5 6.5 0 0 1-.9-12.9A9.5 9.5 0 0 1 26.4 8.6 7.2 7.2 0 0 1 27 22.5h-.5" />
+                            <path d="M18 27V14" />
+                            <path d="m12.6 18.6 5.4-5.4 5.4 5.4" />
+                        </svg>
+                        <div class="t">Drop your dataset here</div>
+                        <div class="o">or <span id="builder-browse">browse files</span></div>
+                        <input type="file" id="builder-file">
+                    </div>
+                    <div class="files" id="builder-files-list">
+                        <div class="row head"><span>Filename</span><span>Type</span><span>Size</span><button class="rm"
+                                id="builder-rm-all">Remove all</button></div>
+                        <div id="builder-items"></div>
+                    </div>
+                </div>
+
+                <div id="vision-studio-ui" class="hidden" style="margin-top: 15px;">
+                    <div style="display:flex; gap: 20px; align-items: flex-start;">
+                        <div
+                            style="flex: 1; background: #000; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; position: relative; aspect-ratio: 4/3;">
+                            <video id="vs-webcam" autoplay playsinline muted
+                                style="width: 100%; height: 100%; object-fit: cover;"></video>
+                            <div id="vs-webcam-error" class="hidden"
+                                style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); color: #ff6b6b; font-size: 13px; text-align: center; padding: 20px; z-index: 5;">
+                            </div>
+                            <div
+                                style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; z-index: 10;">
+                                <button id="vs-webcam-toggle"
+                                    style="background: rgba(0,0,0,0.6); color: #fff; border: 1px solid var(--line); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;">Stop
+                                    Camera</button>
+                            </div>
+                        </div>
+                        <div style="flex: 1; display:flex; flex-direction:column; gap: 15px;">
+                            <div class="vs-class-group" data-class="0">
+                                <input type="text" class="vs-class-name" value="Object 1">
+                                <div style="display:flex; justify-content: space-between; align-items: center;">
+                                    <button class="vs-capture-btn"
+                                        style="background: var(--accent); color: #000; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Start
+                                        Capture</button>
+                                    <span class="vs-count" style="font-size: 13px; color: #a9a7b4;">0 images</span>
+                                </div>
+                                <div class="vs-image-preview-container"></div>
+                            </div>
+                            <div class="vs-class-group" data-class="1">
+                                <input type="text" class="vs-class-name" value="Object 2">
+                                <div style="display:flex; justify-content: space-between; align-items: center;">
+                                    <button class="vs-capture-btn"
+                                        style="background: var(--accent); color: #000; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Start
+                                        Capture</button>
+                                    <span class="vs-count" style="font-size: 13px; color: #a9a7b4;">0 images</span>
+                                </div>
+                                <div class="vs-image-preview-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="build-wrap">
+            <span class="num">03</span>
+            <button class="build" id="builder-btn"><span>Build model</span><svg viewBox="0 0 24 24">
+                    <path d="M4 12h16" />
+                    <path d="m13 5 7 7-7 7" />
+                </svg></button>
+            <div id="builder-status" class="status-msg"></div>
+
+            <div id="builder-terminal" class="terminal-wrap hidden">
+                <div class="term-header">
+                    <div class="term-dot r"></div>
+                    <div class="term-dot y"></div>
+                    <div class="term-dot g"></div>
+                    <span
+                        style="font-size:12px; color:#a9a7b4; margin-left:10px; font-family:monospace;">training.log</span>
+                </div>
+                <div class="term-body" id="term-logs">
+                    <!-- Logs will stream here -->
+                </div>
+
+                <div id="term-chat" class="hidden" style="display: flex; flex-direction: column; height: 320px;">
+                    <div id="term-chat-messages"
+                        style="flex: 1; overflow-y: auto; padding: 15px; font-size: 13.5px; color: #fff; display: flex; flex-direction: column; gap: 12px;">
+                        <div style="text-align: center; color: #a9a7b4; font-size: 12.5px; margin-top: 10px;">Chat
+                            initialized. Start sending messages.</div>
+                    </div>
+                    <div
+                        style="padding: 10px 15px; border-top: 1px solid var(--line-strong); display: flex; gap: 10px; background: rgba(10,9,14,0.5);">
+                        <input type="text" id="term-chat-input" placeholder="Message the model..."
+                            style="flex: 1; height: 38px; background: rgba(255,255,255,0.05); border: 1px solid var(--line-strong); border-radius: 6px; color: #fff; padding: 0 12px; font-size: 13px; outline: none; transition: border-color 0.15s;">
+                        <button class="build" id="term-chat-send"
+                            style="margin: 0; width: 40px; height: 38px; padding: 0;"><svg viewBox="0 0 24 24"
+                                style="stroke: #0b0a10;">
+                                <path d="m22 2-7 20-4-9-9-4Z" />
+                                <path d="M22 2 11 13" />
+                            </svg></button>
+                    </div>
+                </div>
+
+
+                <div class="progress-wrap">
+                    <div class="progress-bar" id="term-progress" style="width: 0%;"></div>
+                    <div class="progress-text" id="term-progress-text">0%</div>
+                </div>
+                <div id="term-leaderboard" class="leaderboard-wrap hidden">
+                    <div class="leaderboard-title">Model Leaderboard (AutoGluon)</div>
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>Algorithm</th>
+                                <th>Score (Val)</th>
+                                <th>Fit Time (s)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="term-leaderboard-body">
+                        </tbody>
+                    </table>
+                    <div id="leaderboard-actions"
+                        style="display: none; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                        <button id="download-model-btn" class="build"
+                            style="height: 35px; width: max-content; padding: 0 25px; margin: 0;">Download Model
+                            (ZIP)</button>
+                        <button id="run-model-btn" class="build"
+                            style="height: 35px; width: max-content; padding: 0 25px; margin: 0;">Run Model</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- VIEW: DATA FACTORY -->
+    <main id="view-data-factory" class="view hidden">
+        <section class="hero">
+            <h1>Data <span class="grad">Factory.</span></h1>
+            <p class="sub">Generate general-purpose synthetic datasets using natural language.</p>
+        </section>
+        <div class="flow" style="margin-top:50px;">
+            <section class="step s1">
+                <span class="num" style="color:#000;">01</span><span class="rail"></span>
+                <h2 style="color: #000;">Dataset Description</h2>
+                <p class="hint" style="color: #000;">Describe the dataset you want to generate</p>
+                <textarea id="df-prompt" autocomplete="off"
+                    placeholder="e.g. Generate a dataset of houses suitable for predicting house prices."
+                    style="width: 100%; height: 100px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; color: #fff; padding: 15px; font-family: inherit; font-size: 14px; outline: none; resize: vertical; margin-top: 15px;"></textarea>
+
+
+                <h3 style="margin-top:20px; font-size:14px; color:#000; font-weight:500;">Number of Rows</h3>
+                <div class="select" id="df-rows-select" style="margin-top: 10px; max-width: 250px;">
+                    <span class="ico"><svg viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:2;">
+                            <path d="M4 6h16M4 12h16M4 18h16" />
+                        </svg></span>
+                    <span class="val" id="df-rows-val" data-val="100">100 Rows</span>
+                    <span class="chev"><svg viewBox="0 0 24 24">
+                            <path d="m6 9 6 6 6-6" />
+                        </svg></span>
+                    <div class="menu" id="df-rows-menu">
+                        <div data-val="10">10 Rows</div>
+                        <div data-val="50">50 Rows</div>
+                        <div class="sel" data-val="100">100 Rows</div>
+                        <div data-val="500">500 Rows</div>
+                        <div data-val="1000">1,000 Rows</div>
+                        <div data-val="5000">5,000 Rows</div>
+                        <div data-val="10000">10,000 Rows</div>
+                        <div data-val="50000">50,000 Rows</div>
+                        <div data-val="100000">100,000 Rows</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 25px;">
+                    <button class="build" id="df-generate-schema-btn" style="width: auto; padding: 0 25px;">Generate
+                        Schema</button>
+                </div>
+            </section>
+
+            <section class="step s-auto2" id="df-schema-section" style="opacity: 0.5; pointer-events: none;">
+                <span class="num">02</span><span class="rail"></span>
+                <h2>Schema Review</h2>
+                <p class="hint">Review the proposed dataset schema</p>
+
+                <div id="df-schema-container" class="terminal-wrap hidden" style="margin-top: 20px;">
+                    <div class="term-header">
+                        <div class="term-dot r"></div>
+                        <div class="term-dot y"></div>
+                        <div class="term-dot g"></div>
+                        <span
+                            style="font-size:12px; color:#a9a7b4; margin-left:10px; font-family:monospace;">schema.json</span>
+                    </div>
+                    <div class="term-body" style="background:#0c0b12;">
+                        <table
+                            style="width: 100%; border-collapse: collapse; text-align: left; font-family: 'Inter', sans-serif;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--line-strong); color: #fff;">
+                                    <th style="padding: 10px;">Column Name</th>
+                                    <th style="padding: 10px;">Type</th>
+                                    <th style="padding: 10px;">Generator</th>
+                                    <th style="padding: 10px;">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody id="df-schema-tbody" style="color: #c4c2ce; font-size: 13px;">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="build-wrap" id="df-generate-section" style="opacity: 0.5; pointer-events: none;">
+            <span class="num">03</span>
+            <button class="build" id="df-generate-dataset-btn"><span>Generate Dataset</span><svg viewBox="0 0 24 24">
+                    <path d="M4 12h16" />
+                    <path d="m13 5 7 7-7 7" />
+                </svg></button>
+            <div id="df-status" class="status-msg"></div>
+
+            <div id="df-progress-container" class="terminal-wrap hidden" style="margin-top: 20px;">
+                <div class="term-header">
+                    <span style="font-size:12px; color:#a9a7b4; margin-left:10px; font-family:monospace;">Generation
+                        Progress</span>
+                </div>
+                <div style="padding: 20px; text-align: center; background: #0c0b12;">
+                    <div class="progress-wrap"
+                        style="display: block; margin: 0 auto 15px auto; width: 100%; max-width: 400px; position: relative;">
+                        <div class="progress-bar" id="df-progress-bar"
+                            style="width: 0%; height: 8px; background: var(--accent); border-radius: 4px; transition: width 0.3s;">
+                        </div>
+                    </div>
+                    <div style="font-size: 16px; color: #fff; font-weight: 500;" id="df-progress-text">Rows generated: 0
+                        / 0</div>
+                    <div style="font-size: 13px; color: #a9a7b4; margin-top: 10px;">
+                        <span id="df-progress-valid" style="color: #27c93f;">Valid: 0</span> &nbsp;|&nbsp;
+                        <span id="df-progress-rejected" style="color: #ff5f56;">Rejected: 0</span> &nbsp;|&nbsp;
+                        <span id="df-progress-dupes" style="color: #ffbd2e;">Duplicates: 0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="df-preview-container" class="hidden" style="margin-top: 20px;">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button class="build" id="df-download-csv"
+                        style="height: 35px; width: max-content; padding: 0 25px; margin: 0;">Download CSV</button>
+                    <button class="build" id="df-download-json"
+                        style="height: 35px; width: max-content; padding: 0 25px; margin: 0; background: transparent; border: 1px solid var(--line-strong); color: #fff;">Download
+                        JSON</button>
+                </div>
+                <div class="terminal-wrap" style="overflow-x: auto;">
+                    <div class="term-header">
+                        <span style="font-size:12px; color:#a9a7b4; margin-left:10px; font-family:monospace;">Data
+                            Preview (First 10 rows)</span>
+                    </div>
+                    <div class="term-body" style="background:#0c0b12; padding: 0;">
+                        <table
+                            style="width: 100%; border-collapse: collapse; text-align: left; font-family: 'Inter', sans-serif; white-space: nowrap;">
+                            <thead id="df-preview-head"
+                                style="border-bottom: 1px solid var(--line-strong); color: #fff; background: rgba(255,255,255,0.02);">
+                            </thead>
+                            <tbody id="df-preview-body" style="color: #c4c2ce; font-size: 13px;">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- VIEW: VISION STUDIO -->
+    <main id="view-vision-studio" class="view hidden">
+        <section class="hero">
+            <h1>Vision <span class="grad">Studio.</span></h1>
+            <p class="sub">Train custom vision classifiers directly.</p>
+        </section>
+        <div class="flow" style="margin-top:50px;">
+            <section class="step s1">
+                <span class="num">01</span><span class="rail"></span>
+                <h2>Backbone Model</h2>
+                <p class="hint">Select the base architecture for transfer learning</p>
+                <div class="select" id="vs-select">
+                    <span class="ico"><svg viewBox="0 0 24 24">
+                            <circle cx="10.5" cy="10.5" r="6.5" />
+                            <path d="m20 20-4.9-4.9" />
+                        </svg></span>
+                    <span class="val" id="vs-val">MobileNet V3 Small</span>
+                    <span class="chev"><svg viewBox="0 0 24 24">
+                            <path d="m6 9 6 6 6-6" />
+                        </svg></span>
+                    <div class="menu" id="vs-menu">
+                        <div class="sel" data-val="mobilenet_v3_small">MobileNet V3 Small</div>
+                        <div data-val="resnet18">ResNet-18</div>
+                    </div>
+                </div>
+            </section>
+            <section class="step s-auto2">
+                <span class="num">02</span><span class="rail"></span>
+                <h2>Classes & Images</h2>
+                <p class="hint">Upload images for each class you want to train.</p>
+                <div id="vs-classes">
+                    <!-- populated by js -->
+                </div>
+                <button class="build" id="vs-add-btn"
+                    style="margin-top:20px; background:transparent; border:1px dashed var(--line-strong); color:#fff;">+
+                    Add Class</button>
+            </section>
+        </div>
+        <div class="build-wrap">
+            <span class="num">03</span>
+            <button class="build" id="vs-btn"><span>Train Classifier</span><svg viewBox="0 0 24 24">
+                    <path d="M4 12h16" />
+                    <path d="m13 5 7 7-7 7" />
+                </svg></button>
+            <div id="vs-status" class="status-msg"></div>
+        </div>
+    </main>
+
+    <!-- VIEW: RUNNER -->
+    <main id="view-runner" class="view hidden">
+        <section class="hero">
+            <h1>Run your <span class="grad">models.</span></h1>
+            <p class="sub">Select a deployed experiment and chat or run predictions natively in the browser.</p>
+        </section>
+        <div class="flow" style="margin-top:50px;">
+            <section class="step s-auto">
+                <span class="num">01</span><span class="rail"></span>
+                <h2>Deployed Experiment</h2>
+                <p class="hint">Select a completed experiment to run</p>
+                <div class="select" id="runner-select">
+                    <span class="ico"><svg viewBox="0 0 24 24">
+                            <circle cx="10.5" cy="10.5" r="6.5" />
+                            <path d="m20 20-4.9-4.9" />
+                        </svg></span>
+                    <span class="val" id="runner-val">Loading experiments...</span>
+                    <span class="chev"><svg viewBox="0 0 24 24">
+                            <path d="m6 9 6 6 6-6" />
+                        </svg></span>
+                    <div class="menu" id="runner-menu">
+                        <div class="sel" data-val="">Loading experiments...</div>
+                    </div>
+                </div>
+            </section>
+            <section class="step s-auto2">
+                <span class="num">02</span><span class="rail"></span>
+                <h2>Input</h2>
+                <p class="hint">Provide input to the model (Text, Image, or Tabular)</p>
+                <div id="runner-text-in">
+                    <textarea id="runner-prompt" placeholder="Ask your model anything..."
+                        style="width: 100%; height: 120px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; color: #fff; padding: 15px; font-family: inherit; font-size: 14px; resize: none; margin-top: 15px;"></textarea>
+                </div>
+                <div id="runner-tabular-in" class="hidden"
+                    style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <!-- Dynamic tabular inputs go here -->
+                </div>
+                <div id="runner-image-in" class="hidden">
+                    <div class="drop" id="runner-img-drop" style="margin-top:15px;">
+                        <svg viewBox="0 0 36 30">
+                            <path
+                                d="M9.5 22.5H9a6.5 6.5 0 0 1-.9-12.9A9.5 9.5 0 0 1 26.4 8.6 7.2 7.2 0 0 1 27 22.5h-.5" />
+                            <path d="M18 27V14" />
+                            <path d="m12.6 18.6 5.4-5.4 5.4 5.4" />
+                        </svg>
+                        <div class="t">Drop image or video for detection</div>
+                        <div class="o">Supports JPG, PNG, WEBP, MP4, AVI, MOV</div>
+                        <input type="file" id="runner-file" accept="image/*,video/*">
+                    </div>
+                    <div id="runner-img-preview" style="margin-top: 10px; display:flex; gap:10px;"></div>
+                    <div id="runner-confidence-wrap"
+                        style="margin-top: 15px; display:flex; align-items:center; gap:12px;">
+                        <label for="runner-confidence"
+                            style="font-size:13px; color:#a9a7b4; white-space:nowrap;">Confidence Threshold</label>
+                        <input type="range" id="runner-confidence" min="0.05" max="0.95" step="0.05" value="0.25"
+                            style="flex:1; accent-color:var(--accent); cursor:pointer;">
+                        <span id="runner-confidence-val"
+                            style="font-size:13px; color:#fff; min-width:36px; text-align:right;">0.25</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <div class="build-wrap">
+            <span class="num">03</span>
+            <button class="build" id="runner-btn"><span>Run Inference</span><svg viewBox="0 0 24 24">
+                    <path d="M4 12h16" />
+                    <path d="m13 5 7 7-7 7" />
+                </svg></button>
+            <div id="runner-status" class="status-msg"></div>
+            <div id="runner-out" class="output-box hidden"></div>
+            <img id="runner-img-out" class="hidden"
+                style="margin-top: 25px; max-width: 100%; border-radius: 8px; border: 1px solid var(--line-strong);" />
+        </div>
+    </main>
+
+    <!-- HF Search Modal -->
+    <div class="modal-overlay" id="hf-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+                        <path d="M2 12h20" />
+                    </svg>
+                    Hugging Face Hub
+                </h3>
+                <button class="modal-close" id="hf-close">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2"
+                        stroke-linecap="round">
+                        <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="hf-search-container">
+                    <svg class="hf-search-icon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"
+                        stroke-linecap="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.3-4.3" />
+                    </svg>
+                    <input type="text" class="hf-search-input" id="hf-search"
+                        placeholder="Search models (e.g., meta-llama, qwen)..." autocomplete="off">
+                </div>
+                <div class="hf-results" id="hf-results">
+                    <!-- Results injected here -->
+                    <div style="text-align: center; color: #a9a7b4; font-size: 13.5px; padding: 20px 0;">Type to search
+                        models from Hugging Face Hub</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vision Studio Inference Modal -->
+    <div class="modal-overlay" id="vs-infer-modal">
+        <div class="modal" style="width: min(800px, 90vw);">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                        <circle cx="12" cy="13" r="3" />
+                    </svg>
+                    Live Inference
+                </h3>
+                <button class="modal-close" id="vs-infer-close">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2"
+                        stroke-linecap="round">
+                        <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 20px; background: #0c0b12;">
+                <div id="vs-infer-ui"
+                    style="height: 480px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--line-strong);">
+                    <video id="vs-infer-webcam" autoplay playsinline
+                        style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    <div
+                        style="position: absolute; bottom: 20px; background: rgba(0,0,0,0.8); padding: 15px 30px; border-radius: 12px; border: 1px solid var(--line-strong); display: flex; flex-direction: column; align-items: center; gap: 8px; backdrop-filter: blur(10px);">
+                        <div id="vs-infer-pred" style="font-size: 28px; font-weight: 700; color: var(--accent);">
+                            Waiting...</div>
+                        <div id="vs-infer-conf" style="font-size: 16px; color: #a9a7b4; font-family: monospace;">--
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="main.js"></script>
+</body>
+
+</html>

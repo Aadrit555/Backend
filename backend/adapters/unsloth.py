@@ -15,6 +15,7 @@ from backend.adapters.base import (
     ResourceEstimate,
     TrainingResult,
 )
+
 # Python 3.14 compatibility monkeypatch for HuggingFace datasets dill pickler
 try:
     import dill
@@ -37,7 +38,6 @@ class UnslothAdapter(BackendAdapter):
         return {
             "supported_tasks": ["fine_tuning", "text_generation", "dpo"],
             "supported_models": [
-                "unsloth_llama3.2_3b", "unsloth_llama3.2_1b", "unsloth_qwen2.5_3b",
                 "unsloth/Llama-3.2-1B-Instruct-bnb-4bit", "unsloth/Llama-3.2-3B-Instruct-bnb-4bit",
                 "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit", "unsloth/Meta-Llama-3.1-70B-Instruct-bnb-4bit",
                 "unsloth/Qwen2.5-0.5B-Instruct-bnb-4bit", "unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit",
@@ -339,10 +339,14 @@ class UnslothAdapter(BackendAdapter):
         dataset = load_dataset("json", data_files=str(dataset_path), split="train")
         
         print("Formatting ShareGPT Dataset...")
-        tokenizer = get_chat_template(
-            tokenizer,
-            chat_template=chat_template,
-        )
+        try:
+            tokenizer = get_chat_template(
+                tokenizer,
+                chat_template=chat_template,
+            )
+        except Exception as e:
+            print(f"Warning: Failed to set predefined chat_template ({chat_template}). Falling back to tokenizer default: {e}")
+            pass
         
         dataset = standardize_sharegpt(dataset)
         
@@ -404,6 +408,35 @@ class UnslothAdapter(BackendAdapter):
         model.save_pretrained(str(adapter_path))
         tokenizer.save_pretrained(str(adapter_path))
         
+        export_gguf = config.get("export_gguf", True)
+        if export_gguf:
+            quantization_method = config.get("gguf_quantization", "q8_0")
+            print(f"Exporting GGUF ({quantization_method}) to {model_out_dir}")
+            import os
+            import sys
+            import subprocess
+            # Ensure llama.cpp's subprocess uses the current virtual environment's python
+            os.environ["PATH"] = f"{sys.prefix}/bin:{os.environ.get('PATH', '')}"
+            try:
+                merged_dir = model_out_dir / "merged"
+                print("Merging weights into 16-bit...")
+                model.save_pretrained_merged(str(merged_dir), tokenizer, save_method="merged_16bit")
+                
+                print(f"Converting to GGUF using llama.cpp ({quantization_method})...")
+                cmd = [
+                    sys.executable,
+                    "llama.cpp/convert_hf_to_gguf.py",
+                    str(merged_dir),
+                    "--outfile",
+                    str(model_out_dir / f"unsloth.{quantization_method.upper()}.gguf"),
+                    "--outtype",
+                    quantization_method
+                ]
+                subprocess.run(cmd, check=True)
+                print("GGUF export successful!")
+            except Exception as e:
+                print(f"Warning: Failed to export GGUF: {e}")
+        
         # Cleanup Memory
         del model
         del tokenizer
@@ -447,10 +480,14 @@ class UnslothAdapter(BackendAdapter):
             except Exception:
                 pass
         
-        tokenizer = get_chat_template(
-            tokenizer,
-            chat_template=chat_template,
-        )
+        try:
+            tokenizer = get_chat_template(
+                tokenizer,
+                chat_template=chat_template,
+            )
+        except Exception as e:
+            print(f"Warning: Inference chat_template fallback: {e}")
+            pass
         return model, tokenizer
 
     def evaluate(self, model_path: Path, dataset_path: Path, config: dict[str, Any]) -> EvaluationResult:
@@ -509,99 +546,23 @@ class UnslothAdapter(BackendAdapter):
         }
         return EvaluationResult(metrics=metrics)
 
-    def export_gguf(self, model_path: Path, output_path: Path, quantization_method: str = "q4_k_m") -> Path:
-        """
-        Exports the fine-tuned LoRA model to GGUF format and writes an Ollama Modelfile.
-        Uses Unsloth's native save_pretrained_gguf if available, or packages a GGUF bundle.
-        """
-        import torch
-        import json
-        import shutil
-
-        if not model_path.exists():
-            raise FileNotFoundError(f"LoRA adapter path does not exist: {model_path}")
-
-        output_path.mkdir(parents=True, exist_ok=True)
-        gguf_file = output_path / f"model-{quantization_method.lower()}.gguf"
-        modelfile_path = output_path / "Modelfile"
-
-        # Determine base model name from adapter_config.json
-        base_model_name = "unsloth/Llama-3.2-1B-Instruct-bnb-4bit"
-        adapter_config_path = model_path / "adapter_config.json"
-        if adapter_config_path.exists():
-            try:
-                with open(adapter_config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    base_model_name = cfg.get("base_model_name_or_path", base_model_name)
-            except Exception:
-                pass
-
-        if torch.cuda.is_available():
-            try:
-                from unsloth import FastLanguageModel
-                model, tokenizer = FastLanguageModel.from_pretrained(
-                    model_name=str(model_path),
-                    max_seq_length=1024,
-                    dtype=None,
-                    load_in_4bit=True,
-                )
-                print(f"[GGUF] Quantizing & saving to GGUF format: {quantization_method} -> {output_path}")
-                model.save_pretrained_gguf(
-                    str(output_path),
-                    tokenizer,
-                    quantization_method=quantization_method.lower(),
-                )
-            except Exception as e:
-                print(f"[GGUF] Live conversion warning: {e}. Writing GGUF metadata bundle.")
-                if not gguf_file.exists():
-                    gguf_file.write_bytes(b"GGUF\x03\x00\x00\x00" + b"\x00" * 1024)
-        else:
-            # CPU fallback / test container
-            print(f"[GGUF] CPU mode: Packaging GGUF metadata bundle for {quantization_method}...")
-            if not gguf_file.exists():
-                gguf_file.write_bytes(b"GGUF\x03\x00\x00\x00" + b"\x00" * 1024)
-
-        # Generate Ollama Modelfile
-        modelfile_content = (
-            f"FROM ./{gguf_file.name}\n\n"
-            f"# PARAMETERS\n"
-            f"PARAMETER stop <|eot_id|>\n"
-            f"PARAMETER stop <|end_of_text|>\n"
-            f"PARAMETER temperature 0.7\n"
-            f"PARAMETER top_p 0.9\n\n"
-            f"# SYSTEM PROMPT\n"
-            f"SYSTEM \"You are a custom AI assistant fine-tuned with Unified ML on {base_model_name}.\"\n"
-        )
-        modelfile_path.write_text(modelfile_content, encoding="utf-8")
-
-        if adapter_config_path.exists():
-            shutil.copy2(adapter_config_path, output_path / "adapter_config.json")
-
-        meta = {
-            "quantization": quantization_method.lower(),
-            "base_model": base_model_name,
-            "gguf_filename": gguf_file.name,
-            "modelfile_filename": "Modelfile",
-            "ollama_run_command": f"ollama create my-model -f ./Modelfile && ollama run my-model"
-        }
-        (output_path / "gguf_manifest.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-
-        return output_path
-
     def export(self, model_path: Path, export_format: str, output_path: Path) -> Path:
         import shutil
         if not model_path.exists():
             raise FileNotFoundError(f"Cannot export missing artifact: {model_path}")
             
-        if export_format.lower().startswith("gguf"):
-            parts = export_format.lower().split(":")
-            quant = parts[1] if len(parts) > 1 else "q4_k_m"
-            return self.export_gguf(model_path, output_path, quantization_method=quant)
-
         if output_path.exists():
             shutil.rmtree(output_path)
             
         shutil.copytree(model_path, output_path)
+
+        source_dir = model_path.parent
+        for gguf_path in sorted(source_dir.rglob("*.gguf")):
+            relative_path = gguf_path.relative_to(source_dir)
+            target_path = output_path / relative_path
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(gguf_path, target_path)
+
         return output_path
 
     def deploy(self, model_path: Path, deploy_config: dict[str, Any]) -> dict[str, Any]:

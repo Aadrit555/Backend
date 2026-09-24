@@ -56,7 +56,7 @@ def _run_expert_pipeline(project_id: str, pipeline_type: str, expert_config: dic
             info = get_model_info(model_name)
             backend = info.get("backends", ["unsloth"])[0] if info else "unsloth"
             training_method = info.get("training_methods", ["lora"])[0] if info else "lora"
-        elif pipeline_type == "vision":
+        elif pipeline_type in ["vision", "object_detection"]:
             candidates = expert_config.get("model_candidates", [])
             model_name = candidates[0] if candidates else "yolov8n"
             from backend.registry.loader import get_model_info
@@ -68,7 +68,7 @@ def _run_expert_pipeline(project_id: str, pipeline_type: str, expert_config: dic
                 backend = "autotrain"
                 training_method = "full"
             else:
-                backend = "ultralytics" if "yolo" in model_name.lower() else "autotrain"
+                backend = "ultralytics" if "yolo" in model_name.lower() or pipeline_type == "object_detection" else "autotrain"
                 training_method = "full"
         else:
             candidates = expert_config.get("model_candidates", [])
@@ -242,6 +242,18 @@ async def api_orchestrate(req: OrchestrateRequest, background_tasks: BackgroundT
     background_tasks.add_task(_run_pipeline, req.project_id, req.goal, req.expert_config)
     return {"status": "started", "project_id": req.project_id}
 
+@router.get("/api/experiments/{experiment_id}/status")
+async def get_experiment_status(experiment_id: str):
+    """Fetch real-time training status and logs for an experiment."""
+    status_path = settings.experiments_dir / experiment_id / "status.json"
+    if not status_path.exists():
+        return []
+    try:
+        content = status_path.read_text()
+        return json.loads(content)
+    except Exception:
+        return []
+
 @router.get("/api/projects/{project_id}")
 async def get_project(project_id: str):
     """Fetch project state from the DB."""
@@ -266,9 +278,24 @@ async def get_project(project_id: str):
                 latest_eval = e.evaluations[-1]
                 if latest_eval.metrics_json:
                     eval_metrics = json.loads(latest_eval.metrics_json)
+            ds = next((d for d in datasets_rows if d.id == e.dataset_id), None)
+            dataset_name = ds.name if ds else None
+            
+            if not dataset_name:
+                valid_ds = [d for d in datasources if d.project_id == project_id and d.uploaded_at <= e.created_at]
+                if not valid_ds:
+                    valid_ds = [d for d in datasources if d.project_id == project_id]
+                
+                if valid_ds:
+                    valid_ds.sort(key=lambda d: d.uploaded_at)
+                    dataset_name = valid_ds[-1].original_filename
+                else:
+                    dataset_name = e.model_name
+
             experiments_data.append({
                 "id": e.id, 
                 "model_name": e.model_name, 
+                "dataset_name": dataset_name,
                 "status": e.status, 
                 "backend": e.backend,
                 "metrics": eval_metrics,
@@ -310,6 +337,68 @@ async def download_model(experiment_id: str, background_tasks: BackgroundTasks):
         filename=f"model_{experiment_id[:8]}.zip",
         media_type="application/zip"
     )
+
+@router.get("/api/experiments/{experiment_id}/download/gguf")
+def download_gguf_model(experiment_id: str):
+    """Download generated GGUF artifact(s) for an experiment."""
+    import zipfile
+
+    db = SessionLocal()
+    try:
+        exp = db.query(Experiment).filter_by(id=experiment_id).first()
+        if not exp:
+            raise HTTPException(status_code=404, detail="Experiment not found.")
+
+        search_roots = [settings.experiments_dir / experiment_id / "export"]
+
+        from backend.db import ModelArtifact, TrainingRun
+
+        run = db.query(TrainingRun).filter_by(experiment_id=experiment_id).first()
+        if run:
+            artifact = db.query(ModelArtifact).filter_by(training_run_id=run.id).first()
+            if artifact:
+                artifact_path = Path(artifact.path)
+                search_roots.extend([artifact_path, artifact_path.parent])
+
+        gguf_files: list[Path] = []
+        seen: set[Path] = set()
+        for root in search_roots:
+            if not root.exists():
+                continue
+            candidates = [root] if root.is_file() and root.suffix.lower() == ".gguf" else root.rglob("*.gguf")
+            for candidate in candidates:
+                resolved = candidate.resolve()
+                if candidate.is_file() and resolved not in seen:
+                    gguf_files.append(candidate)
+                    seen.add(resolved)
+
+        if not gguf_files:
+            raise HTTPException(
+                status_code=404,
+                detail="GGUF artifact not found. Re-run fine-tuning with GGUF export enabled.",
+            )
+
+        gguf_files.sort(key=lambda p: p.name)
+        if len(gguf_files) == 1:
+            gguf_path = gguf_files[0]
+            return FileResponse(
+                path=str(gguf_path),
+                filename=gguf_path.name,
+                media_type="application/octet-stream",
+            )
+
+        zip_path = settings.experiments_dir / experiment_id / f"{experiment_id}_gguf.zip"
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            for gguf_path in gguf_files:
+                zip_file.write(gguf_path, arcname=gguf_path.name)
+
+        return FileResponse(
+            path=str(zip_path),
+            filename=f"gguf_{experiment_id[:8]}.zip",
+            media_type="application/zip",
+        )
+    finally:
+        db.close()
 
 # --- Chat Deployment Endpoint ---
 
@@ -584,15 +673,47 @@ async def predict_vision(
             _active_yolo_model = YOLO("yolov8n.pt")
             _active_yolo_path = "yolov8n.pt"
 
-    # 3. Read image
+    # 3. Read image or video
     try:
-        img_bytes = await file.read()
-        pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        content = await file.read()
+        filename = (file.filename or "").lower()
+        is_video = any(filename.endswith(ext) for ext in [".mp4", ".avi", ".mov", ".mkv", ".webm"])
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid file: {str(e)}")
 
     # 4. Predict
     try:
+        if is_video:
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=Path(filename).suffix, delete=False) as tmp_vid:
+                tmp_vid.write(content)
+                tmp_vid_path = tmp_vid.name
+
+            try:
+                cap = cv2.VideoCapture(tmp_vid_path)
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 1)
+                mid_frame_idx = max(0, total_frames // 2)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, mid_frame_idx)
+                ret, frame_bgr = cap.read()
+                cap.release()
+                if not ret or frame_bgr is None:
+                    # fallback to first frame
+                    cap = cv2.VideoCapture(tmp_vid_path)
+                    ret, frame_bgr = cap.read()
+                    cap.release()
+                if not ret or frame_bgr is None:
+                    raise Exception("Failed to read frames from video")
+
+                frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+                pil_img = Image.fromarray(frame_rgb)
+            finally:
+                try:
+                    os.unlink(tmp_vid_path)
+                except Exception:
+                    pass
+        else:
+            pil_img = Image.open(io.BytesIO(content)).convert("RGB")
+
         results = _active_yolo_model.predict(
             source=pil_img,
             conf=confidence,
@@ -629,7 +750,8 @@ async def predict_vision(
             "count": len(detections),
             "detections": detections,
             "annotated_image": annotated_b64,
-            "speed_ms": first_res.speed,
+            "speed_ms": getattr(first_res, "speed", {}),
+            "is_video": is_video,
         }
     except Exception as e:
         import traceback
@@ -799,132 +921,62 @@ def download_trained_model(experiment_id: str):
         db.close()
 
 
-class GgufExportRequest(BaseModel):
-    quantization_type: str = "Q4_K_M"
-    quantization_method: str | None = None
-    model_name: str | None = None
+class InspectRequest(BaseModel):
+    model_path: str
 
+class PredictTabularRequest(BaseModel):
+    experiment_id: str
+    features: dict
 
-@router.post("/api/experiments/{experiment_id}/export/gguf")
-def export_experiment_gguf(experiment_id: str, req: GgufExportRequest = Body(...)):
-    """Convert and export trained LLM LoRA weights to GGUF format with Ollama Modelfile."""
-    from backend.adapters.unsloth import UnslothAdapter
-    
-    quant_method = (req.quantization_method or req.quantization_type or "Q4_K_M").upper()
-    export_dir = settings.experiments_dir / experiment_id / "export"
-    if not export_dir.exists():
-        for p in settings.models_dir.glob("*"):
-            if p.is_dir() and (p / "adapter_config.json").exists():
-                export_dir = p
-                break
+_active_tabular_model = None
+_active_tabular_path = None
 
-    if not export_dir.exists():
-        # Auto-create export stub for standalone quantization
-        export_dir.mkdir(parents=True, exist_ok=True)
-        model_tag = req.model_name or "unsloth/Llama-3.2-1B-Instruct-bnb-4bit"
-        (export_dir / "adapter_config.json").write_text(json.dumps({
-            "base_model_name_or_path": model_tag,
-            "bias": "none",
-            "lora_alpha": 16,
-            "lora_dropout": 0,
-            "r": 16,
-            "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-            "task_type": "CAUSAL_LM"
-        }, indent=2), encoding="utf-8")
+@router.post("/api/model/inspect")
+async def api_model_inspect(req: InspectRequest):
+    global _active_tabular_model, _active_tabular_path
+    try:
+        from autogluon.tabular import TabularPredictor
+        if _active_tabular_model is None or _active_tabular_path != req.model_path:
+            _active_tabular_model = TabularPredictor.load(req.model_path)
+            _active_tabular_path = req.model_path
+        
+        features = _active_tabular_model.feature_metadata_in.get_features()
+        label = getattr(_active_tabular_model, "label", "target")
+        problem_type = getattr(_active_tabular_model, "problem_type", "unknown")
+        
+        return {
+            "status": "success",
+            "features": features,
+            "target": label,
+            "problem_type": problem_type
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
-    gguf_output_dir = settings.experiments_dir / experiment_id / "gguf"
-    adapter = UnslothAdapter()
-    result_path = adapter.export_gguf(
-        model_path=export_dir,
-        output_path=gguf_output_dir,
-        quantization_method=quant_method,
-    )
-
-    meta_file = result_path / "gguf_manifest.json"
-    meta = json.loads(meta_file.read_text(encoding="utf-8")) if meta_file.exists() else {}
-    
-    modelfile_file = result_path / "Modelfile"
-    modelfile_text = modelfile_file.read_text(encoding="utf-8") if modelfile_file.exists() else ""
-    
-    safe_name = f"custom-model-{quant_method.lower()}"
-    ollama_cmd = f"ollama create {safe_name} -f ./Modelfile && ollama run {safe_name}"
-
-    # Approximate size based on quantization
-    size_map = {"Q4_K_M": 780.4, "Q4_0": 740.0, "Q5_K_M": 920.2, "Q8_0": 1340.8, "F16": 2480.0}
-    size_mb = size_map.get(quant_method, 850.0)
-
-    return {
-        "status": "success",
-        "experiment_id": experiment_id,
-        "quantization_type": quant_method,
-        "export_dir": str(result_path),
-        "gguf_file": f"model-{quant_method.lower()}.gguf",
-        "modelfile": modelfile_text,
-        "ollama_command": ollama_cmd,
-        "size_mb": size_mb,
-        "manifest": meta,
-    }
-
-
-@router.get("/api/experiments/{experiment_id}/download/gguf")
-def download_experiment_gguf(experiment_id: str, quantization: str = "q4_k_m"):
-    """Download the quantized GGUF model binary or zip package."""
-    import zipfile
-    import io
-    from fastapi.responses import StreamingResponse
-    from backend.adapters.unsloth import UnslothAdapter
-
-    gguf_dir = settings.experiments_dir / experiment_id / "gguf"
-    gguf_file = gguf_dir / f"model-{quantization.lower()}.gguf"
-
-    # If not yet exported, automatically trigger export
-    if not gguf_dir.exists() or not gguf_file.exists():
-        export_dir = settings.experiments_dir / experiment_id / "export"
-        if not export_dir.exists():
-            for p in settings.models_dir.glob("*"):
-                if p.is_dir():
-                    export_dir = p
-                    break
-        if export_dir.exists():
-            adapter = UnslothAdapter()
-            adapter.export_gguf(export_dir, gguf_dir, quantization_method=quantization)
-
-    if not gguf_dir.exists():
-        raise HTTPException(status_code=404, detail="GGUF export not available for this experiment.")
-
-    # If single GGUF file exists, return directly or zip with Modelfile
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for file_path in gguf_dir.rglob("*"):
-            if file_path.is_file():
-                zip_file.write(file_path, arcname=str(file_path.relative_to(gguf_dir)))
-                
-    zip_buffer.seek(0)
-    filename = f"model_{experiment_id[:8]}_{quantization.lower()}_gguf.zip"
-    return StreamingResponse(
-        zip_buffer,
-        media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
-
-
-@router.get("/api/experiments/{experiment_id}/modelfile")
-def get_ollama_modelfile(experiment_id: str):
-    """Retrieve the generated Ollama Modelfile contents."""
-    modelfile_path = settings.experiments_dir / experiment_id / "gguf" / "Modelfile"
-    if modelfile_path.exists():
-        return {"modelfile": modelfile_path.read_text(encoding="utf-8")}
-    
-    # Generate on the fly
-    return {
-        "modelfile": (
-            f"FROM ./model-q4_k_m.gguf\n\n"
-            f"PARAMETER stop <|eot_id|>\n"
-            f"PARAMETER stop <|end_of_text|>\n"
-            f"PARAMETER temperature 0.7\n\n"
-            f"SYSTEM \"You are a specialized AI model fine-tuned on Unified ML.\"\n"
-        )
-    }
+@router.post("/api/model/predict")
+async def api_model_predict_tabular(req: PredictTabularRequest):
+    global _active_tabular_model, _active_tabular_path
+    import pandas as pd
+    try:
+        model_path = str(settings.models_dir / req.experiment_id)
+        from autogluon.tabular import TabularPredictor
+        if _active_tabular_model is None or _active_tabular_path != model_path:
+            _active_tabular_model = TabularPredictor.load(model_path)
+            _active_tabular_path = model_path
+            
+        df = pd.DataFrame([req.features])
+        prediction = _active_tabular_model.predict(df)
+        
+        return {
+            "status": "success",
+            "prediction": float(prediction.iloc[0])
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 

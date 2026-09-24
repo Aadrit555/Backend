@@ -58,3 +58,12 @@ unsloth_compiled_cache/
 !ARCHITECTURE.md
 
 backend/scratch/
+
+# === Excluded Tools & Environments ===
+ag-env/
+llama.cpp/
+*.gguf
+unsloth_save_gguf.txt
+generate_gguf_for_user.py
+
+artifacts/

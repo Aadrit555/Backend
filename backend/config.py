@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     # --- Cloud Models ---
     openrouter_api_key: str = ""
 
-    model_config = {"env_file": str(Path(__file__).resolve().parent / ".env"), "env_file_encoding": "utf-8", "extra": "ignore"}
+    model_config = {"env_file": str(Path(__file__).resolve().parent.parent / ".env"), "env_file_encoding": "utf-8", "extra": "ignore"}
 
     def model_post_init(self, __context: object) -> None:
         if not self.database_url:

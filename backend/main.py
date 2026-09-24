@@ -48,16 +48,19 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # single-user local — tighten for production
+    allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 from backend.api import router as api_router
+from backend.synthetic.api import router as synthetic_router
 
 # --- Mount routers ---
 app.include_router(status_router)
 app.include_router(api_router)
+app.include_router(synthetic_router)
 
 
 @app.get("/health")

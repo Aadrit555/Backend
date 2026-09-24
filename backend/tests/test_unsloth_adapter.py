@@ -12,19 +12,12 @@ def test_unsloth_adapter_e2e(tmp_path):
     """
     adapter = UnslothAdapter()
     
-    import gc
-    import torch
-    if torch.cuda.is_available():
-        gc.collect()
-        torch.cuda.empty_cache()
-
     # 1. Capabilities
     caps = adapter.capabilities()
     assert "unsloth_llama3.2_3b" in caps["supported_models"]
     
     # 2. Config 
     config = {
-        "model_name": "unsloth/Llama-3.2-1B-Instruct-bnb-4bit",
         "max_seq_length": 512, # safe default for test
         "per_device_train_batch_size": 1,
         "prepared_dir": str(tmp_path / "prepared")
@@ -36,23 +29,10 @@ def test_unsloth_adapter_e2e(tmp_path):
     assert estimate.vram_required_mb <= 4500
     
     # 4. Prepare (mock dataset)
-    sample_rows = [
-        {"conversations": [{"from": "human", "value": "What is Python?"}, {"from": "gpt", "value": "Python is a programming language."}]},
-        {"conversations": [{"from": "human", "value": "What is PyTorch?"}, {"from": "gpt", "value": "PyTorch is a machine learning framework."}]},
-        {"conversations": [{"from": "human", "value": "Explain LoRA."}, {"from": "gpt", "value": "Low-Rank Adaptation adapts large models efficiently."}]},
-        {"conversations": [{"from": "human", "value": "What is FastAPI?"}, {"from": "gpt", "value": "FastAPI is a modern web framework for Python."}]}
-    ]
-    sample_file = tmp_path / "sample.jsonl"
-    with open(sample_file, "w", encoding="utf-8") as f:
-        for row in sample_rows:
-            f.write(json.dumps(row) + "\n")
-    prepared_dir = adapter.prepare(sample_file, config)
-    assert prepared_dir.exists()
+    prepared_dir = adapter.prepare(Path(tmp_path), config)
+    assert (prepared_dir / "train.jsonl").exists()
     
     # 5. Train
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA GPU required for Unsloth training execution.")
-
     print("\n--- Starting Unsloth Integration Test Training ---")
     train_result = adapter.train(prepared_dir, config)
     print("--- Training Completed ---")
