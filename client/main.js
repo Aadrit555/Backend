@@ -216,8 +216,8 @@ function setVisionMode(mode) {
         if (visionStudioUi) visionStudioUi.classList.add('hidden');
         stopVsWebcam();
 
-        if (s2Title) s2Title.textContent = 'Object Detection Dataset';
-        if (s2Hint) s2Hint.textContent = 'Upload training images, video clips (.mp4, .mov), or annotated YOLO zip archives';
+        if (s2Title) s2Title.textContent = 'Training Data';
+        if (s2Hint) s2Hint.textContent = 'Upload images, video clips, or annotated YOLO datasets';
         if (builderFmt) builderFmt.textContent = 'Supported formats: Images (JPG, PNG, WEBP), Videos (MP4, AVI, MOV), ZIP';
         if (builderBtnSpan) builderBtnSpan.textContent = 'Train Object Detection Model';
 
@@ -237,9 +237,9 @@ function setVisionMode(mode) {
         if (visionStudioUi) visionStudioUi.classList.remove('hidden');
         startVsWebcam();
 
-        if (s2Title) s2Title.textContent = 'Webcam Burst Capture';
-        if (s2Hint) s2Hint.textContent = 'Capture live training images for your custom visual classes';
-        if (builderBtnSpan) builderBtnSpan.textContent = 'Train Classification Model';
+        if (s2Title) s2Title.textContent = 'Training Data';
+        if (s2Hint) s2Hint.textContent = 'Capture live webcam frames for each class';
+        if (builderBtnSpan) builderBtnSpan.textContent = 'Train Classifier';
 
         updateBuilderArchMenu('vision_cls');
     }
@@ -288,7 +288,7 @@ document.querySelectorAll('#builder-tabs .tab').forEach(tab => {
             if (currentPipeline === 'tabular') builderBtnSpan.textContent = 'Build Model';
             else if (currentPipeline === 'llm') builderBtnSpan.textContent = 'Fine-Tune Model';
             else if (currentPipeline === 'rag') builderBtnSpan.textContent = 'Build RAG Pipeline';
-            else if (currentPipeline === 'vision') builderBtnSpan.textContent = currentVisionMode === 'cls' ? 'Train Classification Model' : 'Train Object Detection Model';
+            else if (currentPipeline === 'vision') builderBtnSpan.textContent = currentVisionMode === 'cls' ? 'Train Classifier' : 'Train Object Detection Model';
         }
 
         const builderMainTitle = document.getElementById('builder-main-title');
@@ -310,8 +310,8 @@ document.querySelectorAll('#builder-tabs .tab').forEach(tab => {
                 builderMainSub.textContent = 'Upload your documents, and let the platform handle the rest. We embed and construct the retrieval pipeline automatically.';
                 if (builderFmt) builderFmt.textContent = 'Supported formats: PDF, DOCX, TXT, MD, JSONL';
             } else if (currentPipeline === 'vision') {
-                builderMainTitle.innerHTML = 'Computer Vision <span class="grad">Studio.</span>';
-                builderMainSub.textContent = 'Fine-tune Object Detection models (YOLO11, YOLOv8) with images/video or train real-time image classifiers using webcam burst capture.';
+                builderMainTitle.innerHTML = 'Vision <span class="grad">Studio.</span>';
+                builderMainSub.textContent = 'Train custom vision models directly. Switch between real-time Image Classification and Object Detection.';
             }
         }
 
@@ -399,121 +399,41 @@ document.getElementById('vs-webcam-toggle')?.addEventListener('click', (e) => {
     }
 });
 
-// Teachable Machine dynamic classes & capture
-function setupClassGroupListeners(group) {
-    const classIdx = parseInt(group.dataset.class);
-    const btn = group.querySelector('.vs-capture-btn');
-    const inp = group.querySelector('.vs-class-name');
-    const resetBtn = group.querySelector('.vs-reset-class-btn');
-    const fileInp = group.querySelector('.vs-file-upload');
+// Setup click-to-record logic
+document.querySelectorAll('.vs-capture-btn').forEach((btn) => {
+    const classGroup = btn.closest('.vs-class-group');
+    const classIdx = parseInt(classGroup.dataset.class);
 
-    if (inp) {
-        inp.addEventListener('input', (e) => {
-            if (vsClassesData[classIdx]) {
-                vsClassesData[classIdx].name = e.target.value.trim() || `Class ${classIdx + 1}`;
-            }
-        });
-    }
+    btn.textContent = "Start Capture";
+    let captureInterval = null;
 
-    if (resetBtn) {
-        resetBtn.addEventListener('click', () => {
-            if (vsClassesData[classIdx]) {
-                vsClassesData[classIdx].images = [];
-                group.querySelector('.vs-count').textContent = '0 samples';
-                group.querySelector('.vs-image-preview-container').innerHTML = '';
-            }
-        });
-    }
-
-    if (fileInp) {
-        fileInp.addEventListener('change', (e) => {
-            const files = Array.from(e.target.files || []);
-            files.forEach(f => {
-                const reader = new FileReader();
-                reader.onload = ev => {
-                    const b64 = ev.target.result;
-                    vsClassesData[classIdx].images.push(b64);
-                    group.querySelector('.vs-count').textContent = `${vsClassesData[classIdx].images.length} samples`;
-                    const container = group.querySelector('.vs-image-preview-container');
-                    if (container.children.length < 6) {
-                        const img = document.createElement('img');
-                        img.className = 'vs-img-thumb';
-                        img.src = b64;
-                        container.appendChild(img);
-                    } else {
-                        container.lastChild.src = b64;
-                    }
-                };
-                reader.readAsDataURL(f);
-            });
-        });
-    }
-
-    if (btn) {
-        let captureInterval = null;
-
-        const startCapturing = () => {
-            if (!vsStream || captureInterval) return;
+    btn.addEventListener('click', () => {
+        if (captureInterval) {
+            // Stop capturing
+            clearInterval(captureInterval);
+            captureInterval = null;
+            btn.textContent = "Start Capture";
+            btn.style.background = "var(--accent)";
+        } else {
+            // Start capturing
+            if (!vsStream) return;
             captureInterval = setInterval(() => {
                 captureFrame(classIdx);
-            }, 150); // ~7 FPS
-            btn.textContent = "Recording...";
-            btn.style.background = "#ff5f56";
-        };
+            }, 200); // 5 FPS
+            btn.textContent = "Stop Capture";
+            btn.style.background = "#ff5f56"; // Red to indicate recording
+        }
+    });
+});
 
-        const stopCapturing = () => {
-            if (captureInterval) {
-                clearInterval(captureInterval);
-                captureInterval = null;
-                btn.textContent = "Hold / Click to Capture";
-                btn.style.background = "var(--accent)";
-            }
-        };
-
-        // Click or hold behavior
-        btn.addEventListener('mousedown', startCapturing);
-        btn.addEventListener('mouseup', stopCapturing);
-        btn.addEventListener('mouseleave', stopCapturing);
-        btn.addEventListener('touchstart', (e) => { e.preventDefault(); startCapturing(); });
-        btn.addEventListener('touchend', stopCapturing);
-    }
-}
-
-// Bind initial classes
-document.querySelectorAll('.vs-class-group').forEach(setupClassGroupListeners);
-
-// Add Class button
-document.getElementById('vs-add-class-btn')?.addEventListener('click', () => {
-    const classIdx = vsClassesData.length;
-    const defaultName = `Class ${classIdx + 1}`;
-    vsClassesData.push({ name: defaultName, images: [] });
-
-    const classesList = document.getElementById('vs-classes-list');
-    if (!classesList) return;
-
-    const group = document.createElement('div');
-    group.className = 'vs-class-group';
-    group.dataset.class = classIdx;
-    group.innerHTML = `
-        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <input type="text" class="vs-class-name" value="${defaultName}" style="background:transparent; border:1px solid var(--line); border-radius:4px; color:#fff; padding:4px 8px; font-size:13px; font-weight:600; width: 140px;">
-            <button class="vs-reset-class-btn" data-class="${classIdx}" style="background:transparent; border:none; color:#a9a7b4; font-size:12px; cursor:pointer;" title="Reset class samples">Clear</button>
-        </div>
-        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <div style="display:flex; gap: 6px;">
-                <button class="vs-capture-btn"
-                    style="background: var(--accent); color: #000; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Hold / Click to Capture</button>
-                <label class="vs-upload-label" style="background: rgba(255,255,255,0.06); border: 1px solid var(--line); color: #fff; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; display:flex; align-items:center;">
-                    Upload
-                    <input type="file" class="vs-file-upload" data-class="${classIdx}" multiple accept="image/*" style="display:none;">
-                </label>
-            </div>
-            <span class="vs-count" style="font-size: 13px; color: #a9a7b4;">0 samples</span>
-        </div>
-        <div class="vs-image-preview-container"></div>
-    `;
-    classesList.appendChild(group);
-    setupClassGroupListeners(group);
+document.querySelectorAll('.vs-class-name').forEach((inp) => {
+    inp.addEventListener('input', (e) => {
+        const classGroup = e.target.closest('.vs-class-group');
+        const classIdx = parseInt(classGroup.dataset.class);
+        if (vsClassesData[classIdx]) {
+            vsClassesData[classIdx].name = e.target.value.trim() || `Object ${classIdx + 1}`;
+        }
+    });
 });
 
 function captureFrame(classIdx) {
@@ -532,9 +452,11 @@ function captureFrame(classIdx) {
     // Update UI
     const classGroup = document.querySelector(`.vs-class-group[data-class="${classIdx}"]`);
     if (classGroup) {
-        classGroup.querySelector('.vs-count').textContent = `${vsClassesData[classIdx].images.length} samples`;
+        classGroup.querySelector('.vs-count').textContent = `${vsClassesData[classIdx].images.length} images`;
+
+        // Add thumbnail
         const container = classGroup.querySelector('.vs-image-preview-container');
-        if (container.children.length < 6) {
+        if (container.children.length < 5) {
             const img = document.createElement('img');
             img.className = 'vs-img-thumb';
             img.src = b64;
